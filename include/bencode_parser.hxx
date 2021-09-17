@@ -14,29 +14,26 @@
 namespace bencode {
 
 /**
- * @brief Can be used to specify parsing mode strictness.
- *
- * Strict : Do not tolerate any error. Reliable output.
- * Relaxed : Tolerate all possible errors. Might produce unrealible output.
- */
-enum class Parsing_Mode { Strict, Relaxed };
-
-/**
  * @brief Exception class thrown when parsing fails.
  */
 class bencode_error : public std::exception {
 public:
-	using exception::exception;
+	explicit bencode_error(const std::string_view error) : what_(error){}
 
-	template<typename T>
-	explicit bencode_error(T && error) : what_(std::forward<T>(error)){}
-
-	const char * what [[nodiscard]] () const noexcept override {
+	[[nodiscard]] const char * what() const noexcept override {
 		return what_.data();
 	}
 private:
 	std::string_view what_;
 };
+
+/**
+ * @brief Can be used to specify parsing strictness.
+ *
+ * Strict : Do not tolerate any error. Reliable output.
+ * Relaxed : Tolerate all possible errors. Might produce unrealible output.
+ */
+enum class Parsing_Mode { Strict, Relaxed };
 
 namespace impl {
 
@@ -117,7 +114,7 @@ label_result_type extract_label(T && content,const std::size_t content_length,co
 		result += content[idx++];
 	}
 
-	return std::make_pair(result,idx);
+	return std::make_pair(std::move(result),idx);
 }
 
 template<typename T>
@@ -163,7 +160,7 @@ list_result_type extract_list(T && content,const std::size_t content_length,cons
 		}
 	}
 
-	return std::make_pair(result,idx + 1);
+	return std::make_pair(std::move(result),idx + 1);
 }
 
 template<typename T>
@@ -219,34 +216,34 @@ dict_result_type extract_dictionary(T && content,std::size_t content_length,cons
 		}
 	}
 
-	return std::make_pair(result,idx + 1);
+	return std::make_pair(std::move(result),idx + 1);
 }
 
 } // namespace impl
 
 /**
- * @brief Parses the torrent file contents and returns torrent keys mapped to corresponding values.
+ * @brief Parses the bencoded file contents and returns decoded keys mapped to corresponding values.
  *
- * @param content Contents of the torrent file.
+ * @param content Contents of the bencoded file.
  * @param parsing_mode Parsing strictness specifier.. 
- * @return auto :- std::map<std::string,std::any> :- [dictionary_titles,values].
+ * @return std::map<std::string,std::any> :- [dictionary_titles,values].
  */
 template<typename T>
-auto parse_content(T && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
+std::map<std::string,std::any> parse_content(T && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
 	const auto content_length = std::size(content);
 
 	if(const auto dict_opt = impl::extract_dictionary(std::forward<T>(content),content_length,parsing_mode,0)){
-		const auto & [dict,forward_idx] = dict_opt.value();
-		return dict;
+		auto & [dict,forward_idx] = dict_opt.value();
+		return std::move(dict);
 	}
 
-	return std::map<std::string,std::any>{};
+	return {};
 }
 
 /**
- * @brief Parses the torrent file and returns torrent keys mapped to corresponding values.
+ * @brief Reads the given bencoded file and passes the conents to bencode::parse_content function.
  * 
- * @param file_path Absolute path of the torrent file.
+ * @param file_path Absolute path of the bencoded file.
  * @param parsing_mode Parsing strictness specifier.
  * @return auto :- std::map<std::string,std::any> :- [dictionary_titles,values].
  */
@@ -296,7 +293,7 @@ inline void print(const std::vector<std::any> & parsed_list) noexcept {
  * @warning This function is just for illustration purposes only.
  * @brief Prints the contents of parsed_dictionary by trying all possible types.
  * 
- * @param parsed_dict Parsed torrent file conents returned by bencode::parse_file or bencode::parse_content.
+ * @param parsed_dict Parsed bencoded file conents returned by bencode::parse_file or bencode::parse_content.
  */
 inline void print(const std::map<std::string,std::any> & parsed_dictionary) noexcept {
 		
