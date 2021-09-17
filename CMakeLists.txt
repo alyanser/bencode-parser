@@ -10,11 +10,7 @@ set(CXX_FLAGS "-pipe -pedantic -Wall -Wextra -Wshadow -Wdouble-promotion -Wcast-
 set(CMAKE_CXX_FLAGS_DEBUG "-ggdb3 -fno-omit-frame-pointer ${CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG ${CXX_FLAGS}")
 
-set(SOURCES
-	tests/main.cxx
-)
-
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(${PROJECT_NAME} tests/main.cxx)
 
 include_directories(
          "include"

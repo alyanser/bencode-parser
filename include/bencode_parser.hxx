@@ -9,12 +9,13 @@
 #include <any>
 #include <optional>
 #include <vector>
+#include <iostream>
 
 namespace bencode {
 
 enum class Parsing_Mode { Strict, Relaxed };
 
-class bencode_error : std::exception {
+class bencode_error : public std::exception {
 public:
 	using exception::exception;
 
@@ -30,13 +31,13 @@ private:
 
 namespace impl {
 
-using integer_result_type = std::optional<std::pair<int64_t,size_t>>;
-using label_result_type = std::optional<std::pair<std::string,size_t>>;
-using list_result_type = std::optional<std::pair<std::vector<std::any>,size_t>>;
-using dict_result_type = std::optional<std::pair<std::map<std::string,std::any>,size_t>>;
+using integer_result_type = std::optional<std::pair<std::int64_t,std::size_t>>;
+using label_result_type = std::optional<std::pair<std::string,std::size_t>>;
+using list_result_type = std::optional<std::pair<std::vector<std::any>,std::size_t>>;
+using dict_result_type = std::optional<std::pair<std::map<std::string,std::any>,std::size_t>>;
 
 template<typename T>
-integer_result_type extract_integer(T && content,const size_t content_length,const Parsing_Mode mode,size_t idx){
+integer_result_type extract_integer(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'i'){
@@ -51,7 +52,7 @@ integer_result_type extract_integer(T && content,const size_t content_length,con
 
 	const bool negative = content[idx] == '-';
 	idx += negative;
-	int64_t result = 0;
+	std::int64_t result = 0;
 
 	for(;idx < content_length && content[idx] != 'e';++idx){
 		if(std::isdigit(content[idx])){
@@ -71,19 +72,19 @@ integer_result_type extract_integer(T && content,const size_t content_length,con
 }
 
 template<typename T>
-label_result_type extract_label(T && content,const size_t content_length,const Parsing_Mode mode,size_t idx){
+label_result_type extract_label(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(!std::isdigit(content[idx])){
 		return {};
 	}
 
-	size_t label_length = 0;
+	std::size_t label_length = 0;
 
 	for(;idx < content_length && content[idx] != ':';idx++){
 		if(std::isdigit(content[idx])){
 			label_length *= 10;
-			label_length += static_cast<size_t>(content[idx] - '0');
+			label_length += static_cast<std::size_t>(content[idx] - '0');
 		}else if(mode == Parsing_Mode::Strict){
 			throw bencode_error("Invalid character inside label length");
 		}
@@ -111,10 +112,10 @@ label_result_type extract_label(T && content,const size_t content_length,const P
 }
 
 template<typename T>
-dict_result_type extract_dict(T && content,size_t content_length,Parsing_Mode mode,size_t idx);
+dict_result_type extract_dict(T && content,std::size_t content_length,Parsing_Mode mode,std::size_t idx);
 
 template<typename T>
-list_result_type extract_list(T && content,const size_t content_length,const Parsing_Mode mode,size_t idx){
+list_result_type extract_list(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'l'){
@@ -157,7 +158,7 @@ list_result_type extract_list(T && content,const size_t content_length,const Par
 }
 
 template<typename T>
-dict_result_type extract_dict(T && content,size_t content_length,const Parsing_Mode mode,size_t idx){
+dict_result_type extract_dict(T && content,std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'd'){
@@ -215,7 +216,7 @@ dict_result_type extract_dict(T && content,size_t content_length,const Parsing_M
 } // namespace impl
 
 template<typename T>
-inline auto parse_from_content(T && content,const Parsing_Mode mode = Parsing_Mode::Strict){
+auto parse_content(T && content,const Parsing_Mode mode = Parsing_Mode::Strict){
 	const auto content_length = std::size(content);
 
 	if(const auto dict_opt = impl::extract_dict(std::forward<T>(content),content_length,mode,0)){
@@ -227,18 +228,67 @@ inline auto parse_from_content(T && content,const Parsing_Mode mode = Parsing_Mo
 }
 
 template<typename T>
-auto parse_from_file(T && file_path,const Parsing_Mode mode = Parsing_Mode::Strict){
+auto parse_file(T && file_path,const Parsing_Mode mode = Parsing_Mode::Strict){
 	std::ifstream in_fstream(std::forward<T>(file_path));
 
 	if(!in_fstream.is_open()){
-		throw bencode_error("File doesn't exist or could not be opened for writing");
+		throw bencode_error("File doesn't exist or could not be opened for reading");
 	}
 
 	std::string content;
 
 	for(std::string temp;std::getline(in_fstream,temp);content += temp){}
 
-	return parse_from_content(std::move(content),mode);
+	return parse_content(std::move(content),mode);
+}
+
+void print(const std::map<std::string,std::any> & parsed_dict) noexcept;
+
+inline void print(const std::vector<std::any> & parsed_list) noexcept {
+	
+	for(const auto & value : parsed_list){
+		try{
+			std::cout << std::any_cast<std::string>(value) << ' ';
+		}catch(const std::bad_any_cast & bad_string_cast){
+			try{
+				std::cout << std::any_cast<std::int64_t>(value) << ' ';
+			}catch(const std::bad_any_cast & bad_int_cast){
+				try{
+					print(std::any_cast<decltype(parsed_list)>(value));
+				}catch(const std::bad_any_cast & bad_vector_cast){
+					print(std::any_cast<std::map<std::string,std::any>>(value));
+				}
+			}
+		}
+	}
+}
+
+inline void print(const std::map<std::string,std::any> & parsed_dict) noexcept {
+		
+	for(const auto & [dict_key,value] : parsed_dict){
+		std::cout << dict_key << "  :  ";
+
+		if(dict_key == "pieces"){
+			std::cout << "long non-ascii characters (present in actual dict but nos being printed)\n";
+			continue;
+		}
+
+		try{
+			std::cout << std::any_cast<std::string>(value) << '\n';
+		}catch(const std::bad_any_cast & bad_string_cast){
+			try{
+				std::cout << std::any_cast<std::int64_t>(value) << '\n';
+			}catch(const std::bad_any_cast & bad_int_cast){
+				try{
+					print(std::any_cast<std::vector<std::any>>(value));
+					std::cout << '\n';
+				}catch(const std::bad_any_cast & bad_vector_cast){
+					print(std::any_cast<decltype(parsed_dict)>(value));
+					std::cout << '\n';
+				}
+			}
+		}
+	}
 }
 
 } // namespace bencode
