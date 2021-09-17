@@ -13,14 +13,23 @@
 
 namespace bencode {
 
+/**
+ * @brief Can be used to specify parsing mode strictness.
+ *
+ * Strict : Do not tolerate any error. Reliable output.
+ * Relaxed : Tolerate all possible errors. Might produce unrealible output.
+ */
 enum class Parsing_Mode { Strict, Relaxed };
 
+/**
+ * @brief Exception class thrown when parsing fails.
+ */
 class bencode_error : public std::exception {
 public:
 	using exception::exception;
 
 	template<typename T>
-	explicit bencode_error(T && error) : what_(error){}
+	explicit bencode_error(T && error) : what_(std::forward<T>(error)){}
 
 	const char * what [[nodiscard]] () const noexcept override {
 		return what_.data();
@@ -112,7 +121,7 @@ label_result_type extract_label(T && content,const std::size_t content_length,co
 }
 
 template<typename T>
-dict_result_type extract_dict(T && content,std::size_t content_length,Parsing_Mode mode,std::size_t idx);
+dict_result_type extract_dictionary(T && content,std::size_t content_length,Parsing_Mode mode,std::size_t idx);
 
 template<typename T>
 list_result_type extract_list(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
@@ -141,7 +150,7 @@ list_result_type extract_list(T && content,const std::size_t content_length,cons
 			auto & [list,forward_idx] = list_opt.value();
 			result.emplace_back(std::move(list));
 			idx = forward_idx;
-		}else if(const auto dict_opt = extract_dict(std::forward<T>(content),content_length,mode,idx)){
+		}else if(const auto dict_opt = extract_dictionary(std::forward<T>(content),content_length,mode,idx)){
 			auto & [dict,forward_idx] = dict_opt.value();
 			result.emplace_back(std::move(dict));
 			idx = forward_idx;
@@ -158,7 +167,7 @@ list_result_type extract_list(T && content,const std::size_t content_length,cons
 }
 
 template<typename T>
-dict_result_type extract_dict(T && content,std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
+dict_result_type extract_dictionary(T && content,std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'd'){
@@ -197,7 +206,7 @@ dict_result_type extract_dict(T && content,std::size_t content_length,const Pars
 			auto & [list,forward_idx] = list_opt.value();
 			result.emplace(std::move(key),std::move(list));
 			idx = forward_idx;
-		}else if(const auto dict_opt = extract_dict(std::forward<T>(content),content_length,mode,idx)){
+		}else if(const auto dict_opt = extract_dictionary(std::forward<T>(content),content_length,mode,idx)){
 			auto & [dict,forward_idx] = dict_opt.value();
 			result.emplace(std::move(key),std::move(dict));
 			idx = forward_idx;
@@ -215,11 +224,18 @@ dict_result_type extract_dict(T && content,std::size_t content_length,const Pars
 
 } // namespace impl
 
+/**
+ * @brief Parses the torrent file contents and returns torrent keys mapped to corresponding values.
+ *
+ * @param content Contents of the torrent file.
+ * @param parsing_mode Parsing strictness specifier.. 
+ * @return auto :- std::map<std::string,std::any> :- [dictionary_titles,values].
+ */
 template<typename T>
-auto parse_content(T && content,const Parsing_Mode mode = Parsing_Mode::Strict){
+auto parse_content(T && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
 	const auto content_length = std::size(content);
 
-	if(const auto dict_opt = impl::extract_dict(std::forward<T>(content),content_length,mode,0)){
+	if(const auto dict_opt = impl::extract_dictionary(std::forward<T>(content),content_length,parsing_mode,0)){
 		const auto & [dict,forward_idx] = dict_opt.value();
 		return dict;
 	}
@@ -227,8 +243,15 @@ auto parse_content(T && content,const Parsing_Mode mode = Parsing_Mode::Strict){
 	return std::map<std::string,std::any>{};
 }
 
+/**
+ * @brief Parses the torrent file and returns torrent keys mapped to corresponding values.
+ * 
+ * @param file_path Absolute path of the torrent file.
+ * @param parsing_mode Parsing strictness specifier.
+ * @return auto :- std::map<std::string,std::any> :- [dictionary_titles,values].
+ */
 template<typename T>
-auto parse_file(T && file_path,const Parsing_Mode mode = Parsing_Mode::Strict){
+auto parse_file(T && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
 	std::ifstream in_fstream(std::forward<T>(file_path));
 
 	if(!in_fstream.is_open()){
@@ -239,10 +262,14 @@ auto parse_file(T && file_path,const Parsing_Mode mode = Parsing_Mode::Strict){
 
 	for(std::string temp;std::getline(in_fstream,temp);content += temp){}
 
-	return parse_content(std::move(content),mode);
+	return parse_content(std::move(content),parsing_mode);
 }
 
+namespace experimental {
+
 void print(const std::map<std::string,std::any> & parsed_dict) noexcept;
+
+namespace impl {
 
 inline void print(const std::vector<std::any> & parsed_list) noexcept {
 	
@@ -254,22 +281,30 @@ inline void print(const std::vector<std::any> & parsed_list) noexcept {
 				std::cout << std::any_cast<std::int64_t>(value) << ' ';
 			}catch(const std::bad_any_cast & bad_int_cast){
 				try{
-					print(std::any_cast<decltype(parsed_list)>(value));
+					impl::print(std::any_cast<decltype(parsed_list)>(value));
 				}catch(const std::bad_any_cast & bad_vector_cast){
-					print(std::any_cast<std::map<std::string,std::any>>(value));
+					experimental::print(std::any_cast<std::map<std::string,std::any>>(value));
 				}
 			}
 		}
 	}
 }
 
-inline void print(const std::map<std::string,std::any> & parsed_dict) noexcept {
+} // namespace impl
+
+/**
+ * @warning This function is just for illustration purposes only.
+ * @brief Prints the contents of parsed_dictionary by trying all possible types.
+ * 
+ * @param parsed_dict Parsed torrent file conents returned by bencode::parse_file or bencode::parse_content.
+ */
+inline void print(const std::map<std::string,std::any> & parsed_dictionary) noexcept {
 		
-	for(const auto & [dict_key,value] : parsed_dict){
+	for(const auto & [dict_key,value] : parsed_dictionary){
 		std::cout << dict_key << "  :  ";
 
 		if(dict_key == "pieces"){
-			std::cout << "long non-ascii characters (present in actual dict but nos being printed)\n";
+			std::cout << "long non-ascii characters (present in actual dict but not being printed)\n";
 			continue;
 		}
 
@@ -280,16 +315,18 @@ inline void print(const std::map<std::string,std::any> & parsed_dict) noexcept {
 				std::cout << std::any_cast<std::int64_t>(value) << '\n';
 			}catch(const std::bad_any_cast & bad_int_cast){
 				try{
-					print(std::any_cast<std::vector<std::any>>(value));
+					impl::print(std::any_cast<std::vector<std::any>>(value));
 					std::cout << '\n';
 				}catch(const std::bad_any_cast & bad_vector_cast){
-					print(std::any_cast<decltype(parsed_dict)>(value));
+					print(std::any_cast<decltype(parsed_dictionary)>(value));
 					std::cout << '\n';
 				}
 			}
 		}
 	}
 }
+
+} // namespace experimental
 
 } // namespace bencode
 
