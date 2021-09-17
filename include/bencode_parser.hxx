@@ -9,9 +9,10 @@
 #include <any>
 #include <optional>
 #include <vector>
-#include <iostream>
 
 namespace bencode {
+
+enum class Parsing_Mode { Strict, Relaxed };
 
 class bencode_error : std::exception {
 public:
@@ -35,7 +36,7 @@ using list_result_type = std::optional<std::pair<std::vector<std::any>,size_t>>;
 using dict_result_type = std::optional<std::pair<std::map<std::string,std::any>,size_t>>;
 
 template<typename T>
-integer_result_type extract_integer(T && content,const size_t content_length,size_t idx){
+integer_result_type extract_integer(T && content,const size_t content_length,const Parsing_Mode mode,size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'i'){
@@ -48,21 +49,20 @@ integer_result_type extract_integer(T && content,const size_t content_length,siz
 		throw bencode_error(ending_not_found.data());
 	}
 
-	int64_t result = 0;
 	const bool negative = content[idx] == '-';
-
 	idx += negative;
+	int64_t result = 0;
 
 	for(;idx < content_length && content[idx] != 'e';++idx){
-		if(!std::isdigit(content[idx])){
+		if(std::isdigit(content[idx])){
+			result *= 10;
+			result += content[idx] - '0';
+		}else if(mode == Parsing_Mode::Strict){
 			throw bencode_error("Non-digits between 'i' and 'e'");
 		}
-
-		result *= 10;
-		result += content[idx] - '0';
 	}
 
-	if(idx == content_length){ // could not spot 'e'
+	if(idx == content_length){
 		throw bencode_error(ending_not_found.data());
 	}
 
@@ -71,7 +71,7 @@ integer_result_type extract_integer(T && content,const size_t content_length,siz
 }
 
 template<typename T>
-label_result_type extract_label(T && content,const size_t content_length,size_t idx){
+label_result_type extract_label(T && content,const size_t content_length,const Parsing_Mode mode,size_t idx){
 	assert(idx < content_length);
 
 	if(!std::isdigit(content[idx])){
@@ -81,12 +81,12 @@ label_result_type extract_label(T && content,const size_t content_length,size_t 
 	size_t label_length = 0;
 
 	for(;idx < content_length && content[idx] != ':';idx++){
-		if(!std::isdigit(content[idx])){
+		if(std::isdigit(content[idx])){
+			label_length *= 10;
+			label_length += static_cast<size_t>(content[idx] - '0');
+		}else if(mode == Parsing_Mode::Strict){
 			throw bencode_error("Invalid character inside label length");
 		}
-
-		label_length *= 10;
-		label_length += static_cast<size_t>(content[idx] - '0');
 	}
 
 	if(idx >= content_length){
@@ -101,7 +101,7 @@ label_result_type extract_label(T && content,const size_t content_length,size_t 
 
 	while(label_length--){
 		if(idx >= content_length){
-			throw bencode_error("Label doesn't have enough characters as the associated length");
+			break;
 		}
 
 		result += content[idx++];
@@ -111,10 +111,10 @@ label_result_type extract_label(T && content,const size_t content_length,size_t 
 }
 
 template<typename T>
-dict_result_type extract_dict(T && content,size_t content_length,size_t idx);
+dict_result_type extract_dict(T && content,size_t content_length,Parsing_Mode mode,size_t idx);
 
 template<typename T>
-list_result_type extract_list(T && content,const size_t content_length,size_t idx){
+list_result_type extract_list(T && content,const size_t content_length,const Parsing_Mode mode,size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'l'){
@@ -128,23 +128,27 @@ list_result_type extract_list(T && content,const size_t content_length,size_t id
 			break;
 		}
 		
-		if(const auto integer_opt = extract_integer(std::forward<T>(content),content_length,idx)){
+		if(const auto integer_opt = extract_integer(std::forward<T>(content),content_length,mode,idx)){
 			const auto [integer,forward_idx] = integer_opt.value();
 			result.emplace_back(integer);
 			idx = forward_idx;
-		}else if(const auto label_opt = extract_label(std::forward<T>(content),content_length,idx)){
+		}else if(const auto label_opt = extract_label(std::forward<T>(content),content_length,mode,idx)){
 			auto & [label,forward_idx] = label_opt.value();
 			result.emplace_back(std::move(label));
 			idx = forward_idx;
-		}else if(const auto list_opt = extract_list(std::forward<T>(content),content_length,idx)){
+		}else if(const auto list_opt = extract_list(std::forward<T>(content),content_length,mode,idx)){
 			auto & [list,forward_idx] = list_opt.value();
 			result.emplace_back(std::move(list));
 			idx = forward_idx;
-		}else if(const auto dict_opt = extract_dict(std::forward<T>(content),content_length,idx)){
+		}else if(const auto dict_opt = extract_dict(std::forward<T>(content),content_length,mode,idx)){
 			auto & [dict,forward_idx] = dict_opt.value();
 			result.emplace_back(std::move(dict));
 			idx = forward_idx;
 		}else{
+			if(mode == Parsing_Mode::Relaxed){
+				break;
+			}
+
 			return {};
 		}
 	}
@@ -153,7 +157,7 @@ list_result_type extract_list(T && content,const size_t content_length,size_t id
 }
 
 template<typename T>
-dict_result_type extract_dict(T && content,size_t content_length,size_t idx){
+dict_result_type extract_dict(T && content,size_t content_length,const Parsing_Mode mode,size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'd'){
@@ -167,33 +171,40 @@ dict_result_type extract_dict(T && content,size_t content_length,size_t idx){
 			break;
 		}
 		
-		const auto key_opt = extract_label(std::forward<T>(content),content_length,idx);
+		const auto key_opt = extract_label(std::forward<T>(content),content_length,mode,idx);
 
 		if(!key_opt.has_value()){
-			break;
+			if(mode == Parsing_Mode::Relaxed){
+				break;
+			}
+
+			throw bencode_error("Invalid or non-existent dictionary key");
 		}
 
-		const auto & [key,key_forward_idx] = key_opt.value();
-
+		auto & [key,key_forward_idx] = key_opt.value();
 		idx = key_forward_idx;
 
-		if(const auto integer_opt = extract_integer(std::forward<T>(content),content_length,idx)){
+		if(const auto integer_opt = extract_integer(std::forward<T>(content),content_length,mode,idx)){
 			const auto [integer,forward_idx] = integer_opt.value();
-			result.emplace(key,integer);
+			result.emplace(std::move(key),integer);
 			idx = forward_idx;
-		}else if(const auto label_opt = extract_label(std::forward<T>(content),content_length,idx)){
+		}else if(const auto label_opt = extract_label(std::forward<T>(content),content_length,mode,idx)){
 			auto & [label,forward_idx] = label_opt.value();
-			result.emplace(key,std::move(label));
+			result.emplace(std::move(key),std::move(label));
 			idx = forward_idx;
-		}else if(const auto list_opt = extract_list(std::forward<T>(content),content_length,idx)){
+		}else if(const auto list_opt = extract_list(std::forward<T>(content),content_length,mode,idx)){
 			auto & [list,forward_idx] = list_opt.value();
-			result.emplace(key,std::move(list));
+			result.emplace(std::move(key),std::move(list));
 			idx = forward_idx;
-		}else if(const auto dict_opt = extract_dict(std::forward<T>(content),content_length,idx)){
+		}else if(const auto dict_opt = extract_dict(std::forward<T>(content),content_length,mode,idx)){
 			auto & [dict,forward_idx] = dict_opt.value();
-			result.emplace(key,std::move(dict));
+			result.emplace(std::move(key),std::move(dict));
 			idx = forward_idx;
 		}else{
+			if(mode == Parsing_Mode::Relaxed){
+				break;
+			}
+
 			return {};
 		}
 	}
@@ -204,19 +215,19 @@ dict_result_type extract_dict(T && content,size_t content_length,size_t idx){
 } // namespace impl
 
 template<typename T>
-inline std::map<std::string,std::any> parse_from_content(T && content){
+inline auto parse_from_content(T && content,const Parsing_Mode mode = Parsing_Mode::Strict){
 	const auto content_length = std::size(content);
 
-	if(const auto dict_opt = impl::extract_dict(std::forward<T>(content),content_length,0)){
+	if(const auto dict_opt = impl::extract_dict(std::forward<T>(content),content_length,mode,0)){
 		const auto & [dict,forward_idx] = dict_opt.value();
 		return dict;
 	}
 
-	return {};
+	return std::map<std::string,std::any>{};
 }
 
 template<typename T>
-auto parse_from_file(T && file_path){
+auto parse_from_file(T && file_path,const Parsing_Mode mode = Parsing_Mode::Strict){
 	std::ifstream in_fstream(std::forward<T>(file_path));
 
 	if(!in_fstream.is_open()){
@@ -227,7 +238,7 @@ auto parse_from_file(T && file_path){
 
 	for(std::string temp;std::getline(in_fstream,temp);content += temp){}
 
-	return parse_from_content(std::move(content));
+	return parse_from_content(std::move(content),mode);
 }
 
 } // namespace bencode

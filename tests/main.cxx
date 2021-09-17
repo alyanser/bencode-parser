@@ -2,10 +2,8 @@
 #include <iostream>
 
 int main() try {
-	const auto result = bencode::parse_from_file("sample.torrent");
-
-	for(const auto & [key,value] : result){
-		std::cout << key << '\n';
+	for(const auto & [key,value] : bencode::parse_from_file("sintel.torrent",bencode::Parsing_Mode::Strict)){
+		std::cout << key << ' ';
 		// std::cout << std::any_cast<int32_t>(value) << '\n';
 	}
 }catch(const std::exception & exception){
