@@ -14,6 +14,8 @@ set(SOURCES
 	tests/main.cxx
 )
 
+add_executable(${PROJECT_NAME} ${SOURCES})
+
 include_directories(
          "include"
 )
