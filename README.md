@@ -17,8 +17,8 @@ std::any_cast the following types to extract the result from bencode::result_typ
 
 std::string for labels
 std::int64_t for integers
-std::vector< std::any > for nested lists
-std::map< std::string ,std::any > for nested dictionaries
+bencode::list_type for nested lists
+bencode::dictionary_type for nested dictionaries
 
 See the header file for more details
 </pre>
