@@ -243,7 +243,6 @@ result_type parse_content(T && content,const Parsing_Mode parsing_mode = Parsing
 
 	if(const auto dict_opt = impl::extract_dictionary(std::forward<T>(content),content_length,parsing_mode,0)){
 		auto & [dict,forward_idx] = dict_opt.value();
-		std::cerr << "valid";
 		return std::move(dict);
 	}
 
@@ -253,9 +252,9 @@ result_type parse_content(T && content,const Parsing_Mode parsing_mode = Parsing
 /**
  * @brief Reads the given bencoded file and passes the conents to bencode::parse_content function.
  * 
- * @param file_path Absolute path of the bencoded file.
+ * @param file_path Path of the bencoded file.
  * @param parsing_mode Parsing strictness specifier.
- * @return result_type :- [dictionary_titles,values].
+ * @return result_type :- [dictionary_titles,values.
  */
 template<typename T>
 result_type parse_file(T && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
