@@ -15,6 +15,12 @@ bencode::dump_content(result);
 <pre>
 See examples/example.cxx
 </pre>
+
+<b>Installation</b>
+<pre>
+Just include bencode_parser.hxx
+</pre>
+</pre>
 <b>Parsing Mode</b>
 <pre>
 Pass any of these enum constants to the functions mentioned in Api.<Br>
