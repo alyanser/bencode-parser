@@ -18,6 +18,8 @@ namespace bencode {
  */
 class bencode_error : public std::exception {
 public:
+	using exception::exception;
+
 	explicit bencode_error(const std::string_view error) : what_(error){}
 
 	[[nodiscard]] const char * what() const noexcept override {
@@ -37,10 +39,13 @@ enum class Parsing_Mode { Strict, Relaxed };
 
 namespace impl {
 
+using list_type = std::vector<std::any>;
+using dictionary_type = std::map<std::string,std::any>;
+
 using integer_result_type = std::optional<std::pair<std::int64_t,std::size_t>>;
 using label_result_type = std::optional<std::pair<std::string,std::size_t>>;
-using list_result_type = std::optional<std::pair<std::vector<std::any>,std::size_t>>;
-using dict_result_type = std::optional<std::pair<std::map<std::string,std::any>,std::size_t>>;
+using list_result_type = std::optional<std::pair<list_type,std::size_t>>;
+using dictionary_result_type = std::optional<std::pair<dictionary_type,std::size_t>>;
 
 template<typename T>
 integer_result_type extract_integer(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
@@ -118,7 +123,7 @@ label_result_type extract_label(T && content,const std::size_t content_length,co
 }
 
 template<typename T>
-dict_result_type extract_dictionary(T && content,std::size_t content_length,Parsing_Mode mode,std::size_t idx);
+dictionary_result_type extract_dictionary(T && content,std::size_t content_length,Parsing_Mode mode,std::size_t idx);
 
 template<typename T>
 list_result_type extract_list(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
@@ -147,9 +152,9 @@ list_result_type extract_list(T && content,const std::size_t content_length,cons
 			auto & [list,forward_idx] = list_opt.value();
 			result.emplace_back(std::move(list));
 			idx = forward_idx;
-		}else if(const auto dict_opt = extract_dictionary(std::forward<T>(content),content_length,mode,idx)){
-			auto & [dict,forward_idx] = dict_opt.value();
-			result.emplace_back(std::move(dict));
+		}else if(const auto dictionary_opt = extract_dictionary(std::forward<T>(content),content_length,mode,idx)){
+			auto & [dictionary,forward_idx] = dictionary_opt.value();
+			result.emplace_back(std::move(dictionary));
 			idx = forward_idx;
 		}else{
 			if(mode == Parsing_Mode::Relaxed){
@@ -164,7 +169,7 @@ list_result_type extract_list(T && content,const std::size_t content_length,cons
 }
 
 template<typename T>
-dict_result_type extract_dictionary(T && content,std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
+dictionary_result_type extract_dictionary(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'd'){
@@ -203,9 +208,9 @@ dict_result_type extract_dictionary(T && content,std::size_t content_length,cons
 			auto & [list,forward_idx] = list_opt.value();
 			result.emplace(std::move(key),std::move(list));
 			idx = forward_idx;
-		}else if(const auto dict_opt = extract_dictionary(std::forward<T>(content),content_length,mode,idx)){
-			auto & [dict,forward_idx] = dict_opt.value();
-			result.emplace(std::move(key),std::move(dict));
+		}else if(const auto dictionary_opt = extract_dictionary(std::forward<T>(content),content_length,mode,idx)){
+			auto & [dictionary,forward_idx] = dictionary_opt.value();
+			result.emplace(std::move(key),std::move(dictionary));
 			idx = forward_idx;
 		}else{
 			if(mode == Parsing_Mode::Relaxed){
@@ -216,19 +221,19 @@ dict_result_type extract_dictionary(T && content,std::size_t content_length,cons
 		}
 	}
 
-	return std::make_pair(std::move(result),idx + 1);
+	return std::pair{result,idx + 1};
 }
 
 } // namespace impl
 
-using result_type = std::map<std::string,std::any>;
+using result_type = impl::dictionary_type;
 
 /**
  * @brief Parses the bencoded file contents and returns decoded keys mapped to corresponding values.
  *
  * @param content Contents of the bencoded file.
  * @param parsing_mode Parsing strictness specifier.. 
- * @return std::map<std::string,std::any> :- [dictionary_titles,values].
+ * @return result_type :- [dictionary_titles,values].
  */
 template<typename T>
 result_type parse_content(T && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
@@ -247,7 +252,7 @@ result_type parse_content(T && content,const Parsing_Mode parsing_mode = Parsing
  * 
  * @param file_path Absolute path of the bencoded file.
  * @param parsing_mode Parsing strictness specifier.
- * @return auto :- std::map<std::string,std::any> :- [dictionary_titles,values].
+ * @return result_type :- [dictionary_titles,values].
  */
 template<typename T>
 result_type parse_file(T && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
@@ -264,68 +269,50 @@ result_type parse_file(T && file_path,const Parsing_Mode parsing_mode = Parsing_
 	return parse_content(std::move(content),parsing_mode);
 }
 
-namespace experimental {
-
-void print(const std::map<std::string,std::any> & parsed_dict) noexcept;
-
-namespace impl {
-
-inline void print(const std::vector<std::any> & parsed_list) noexcept {
-	
-	for(const auto & value : parsed_list){
-		try{
-			std::cout << std::any_cast<std::string>(value) << ' ';
-		}catch(const std::bad_any_cast & bad_string_cast){
-			try{
-				std::cout << std::any_cast<std::int64_t>(value) << ' ';
-			}catch(const std::bad_any_cast & bad_int_cast){
-				try{
-					impl::print(std::any_cast<decltype(parsed_list)>(value));
-				}catch(const std::bad_any_cast & bad_vector_cast){
-					experimental::print(std::any_cast<result_type>(value));
-				}
-			}
-		}
-	}
-}
-
-} // namespace impl
-
 /**
- * @warning This function is just for illustration purposes only. 
- * @brief Prints the contents of parsed_dictionary by trying all possible types.
+ * @brief Prints the parsed dictionary.
  * 
- * @param parsed_dict Parsed bencoded file conents returned by bencode::parse_file or bencode::parse_content.
+ * @param parsed_dict Parsed bencoded file contents returned by bencode::parse_file or bencode::parse_content.
  */
 inline void print(const std::map<std::string,std::any> & parsed_dictionary) noexcept {
+
+	auto print_list = [](auto compare_hash,const auto & list){
+		for(const auto & value : list){
+			compare_hash(compare_hash,value,value.type().hash_code());
+		}
+	};
+
+	auto compare_hash = [print_list](auto compare_hash,const auto & value,const auto value_type_hash) -> void {
+		const static auto label_type_hash = typeid(std::string).hash_code();
+		const static auto integer_type_hash = typeid(std::int64_t).hash_code();
+		const static auto list_Type_hash = typeid(impl::list_type).hash_code();
+		const static auto dictionary_type_hash = typeid(impl::dictionary_type).hash_code();
+
+		if(value_type_hash == label_type_hash){
+			std::cout << std::any_cast<std::string>(value) << ' ';
+		}else if(value_type_hash == integer_type_hash){
+			std::cout << std::any_cast<std::int64_t>(value) << ' ';
+		}else if(value_type_hash == list_Type_hash){
+			print_list(compare_hash,std::any_cast<impl::list_type>(value));
+		}else if(value_type_hash == dictionary_type_hash){
+			print(std::any_cast<impl::dictionary_type>(value));
+		}else{
+			__builtin_unreachable();
+		}
+	};
 		
 	for(const auto & [dict_key,value] : parsed_dictionary){
 		std::cout << dict_key << "  :  ";
 
 		if(dict_key == "pieces"){
-			std::cout << "long non-ascii characters (present in actual dict but not being printed)\n";
-			continue;
+			std::cout << "long non-ascii characters (present in dictionary but not being printed)";
+		}else{
+			compare_hash(compare_hash,value,value.type().hash_code());
 		}
 
-		try{
-			std::cout << std::any_cast<std::string>(value) << '\n';
-		}catch(const std::bad_any_cast & bad_string_cast){
-			try{
-				std::cout << std::any_cast<std::int64_t>(value) << '\n';
-			}catch(const std::bad_any_cast & bad_int_cast){
-				try{
-					impl::print(std::any_cast<std::vector<std::any>>(value));
-					std::cout << '\n';
-				}catch(const std::bad_any_cast & bad_vector_cast){
-					print(std::any_cast<decltype(parsed_dictionary)>(value));
-					std::cout << '\n';
-				}
-			}
-		}
+		std::cout << '\n';
 	}
 }
-
-} // namespace experimental
 
 } // namespace bencode
 
