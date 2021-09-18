@@ -26,7 +26,8 @@ See the header file for more details
 <b>Testing</b>
 <pre>
 git clone https://github.com/alyanser/bencode-parser
-mkdir build && cd build && ./bencode-parser
+cd ./bencode-parser && mkdir build && cd build 
+cmake .. && make && ./bencode-parser
 </pre>
 
 <b>Sample output for a torrent file</b>
