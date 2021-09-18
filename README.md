@@ -33,7 +33,7 @@ cmake .. && make && ./bencode-parser
 --- big-buck-bunny.torrent taken from https://webtorrent.io/free-torrents ---
 
 announce  :  udp://tracker.leechers-paradise.org:6969
-announce-list  :  udp://tracker.leechers-paradise.org:6969 udp://tracker.coppersurfer.tk:6969 ...
+announce-list  :  udp://tracker.leechers-paradise.org:6969 udp://tracker.coppersurfer.tk:6969
 comment  :  WebTorrent <https://webtorrent.io>
 created by  :  WebTorrent <https://webtorrent.io>
 creation date  :  1490916601
