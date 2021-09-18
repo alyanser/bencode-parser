@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(bencode_parser)
+project(bencode-parser)
 
 set(CMAKE_CXX_COMPILER "clang++-13")
 set(CMAKE_CXX_STANDARD "17")
@@ -10,7 +10,7 @@ set(CXX_FLAGS "-pipe -pedantic -Wall -Wextra -Wshadow -Wdouble-promotion -Wcast-
 set(CMAKE_CXX_FLAGS_DEBUG "-ggdb3 -fno-omit-frame-pointer ${CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG ${CXX_FLAGS}")
 
-add_executable(${PROJECT_NAME} test.cxx)
+add_executable(${PROJECT_NAME} tests/main.cxx)
 
 include_directories(
          "include"

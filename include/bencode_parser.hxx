@@ -221,6 +221,8 @@ dict_result_type extract_dictionary(T && content,std::size_t content_length,cons
 
 } // namespace impl
 
+using result_type = std::map<std::string,std::any>;
+
 /**
  * @brief Parses the bencoded file contents and returns decoded keys mapped to corresponding values.
  *
@@ -229,7 +231,7 @@ dict_result_type extract_dictionary(T && content,std::size_t content_length,cons
  * @return std::map<std::string,std::any> :- [dictionary_titles,values].
  */
 template<typename T>
-std::map<std::string,std::any> parse_content(T && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
+result_type parse_content(T && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
 	const auto content_length = std::size(content);
 
 	if(const auto dict_opt = impl::extract_dictionary(std::forward<T>(content),content_length,parsing_mode,0)){
@@ -248,7 +250,7 @@ std::map<std::string,std::any> parse_content(T && content,const Parsing_Mode par
  * @return auto :- std::map<std::string,std::any> :- [dictionary_titles,values].
  */
 template<typename T>
-auto parse_file(T && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
+result_type parse_file(T && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
 	std::ifstream in_fstream(std::forward<T>(file_path));
 
 	if(!in_fstream.is_open()){
@@ -280,7 +282,7 @@ inline void print(const std::vector<std::any> & parsed_list) noexcept {
 				try{
 					impl::print(std::any_cast<decltype(parsed_list)>(value));
 				}catch(const std::bad_any_cast & bad_vector_cast){
-					experimental::print(std::any_cast<std::map<std::string,std::any>>(value));
+					experimental::print(std::any_cast<result_type>(value));
 				}
 			}
 		}
@@ -290,7 +292,7 @@ inline void print(const std::vector<std::any> & parsed_list) noexcept {
 } // namespace impl
 
 /**
- * @warning This function is just for illustration purposes only.
+ * @warning This function is just for illustration purposes only. 
  * @brief Prints the contents of parsed_dictionary by trying all possible types.
  * 
  * @param parsed_dict Parsed bencoded file conents returned by bencode::parse_file or bencode::parse_content.
