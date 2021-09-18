@@ -8,7 +8,7 @@ bencode::result_type result = bencode::parse_file(file_path);
 or
 bencode::result_type result = bencode::parse_content(content);
 
-bencode::experimental::print(result);
+bencode::print(result);
 </pre>
 
 <b>Usage</b>
