@@ -37,10 +37,11 @@ private:
  */
 enum class Parsing_Mode { Strict, Relaxed };
 
-namespace impl {
-
 using list_type = std::vector<std::any>;
 using dictionary_type = std::map<std::string,std::any>;
+
+namespace impl {
+
 
 using integer_result_type = std::optional<std::pair<std::int64_t,std::size_t>>;
 using label_result_type = std::optional<std::pair<std::string,std::size_t>>;
@@ -228,7 +229,7 @@ dictionary_result_type extract_dictionary(T && content,const std::size_t content
 
 } // namespace impl
 
-using result_type = impl::dictionary_type;
+using result_type = dictionary_type;
 
 /**
  * @brief Parses the bencoded file contents and returns decoded keys mapped to corresponding values.
@@ -289,17 +290,17 @@ inline void dump_content(const std::map<std::string,std::any> & parsed_dictionar
 	auto compare_hash = [dump_list](auto compare_hash,const auto & value,const auto value_type_hash) -> void {
 		const static auto label_type_hash = typeid(std::string).hash_code();
 		const static auto integer_type_hash = typeid(std::int64_t).hash_code();
-		const static auto list_Type_hash = typeid(impl::list_type).hash_code();
-		const static auto dictionary_type_hash = typeid(impl::dictionary_type).hash_code();
+		const static auto list_Type_hash = typeid(list_type).hash_code();
+		const static auto dictionary_type_hash = typeid(dictionary_type).hash_code();
 
 		if(value_type_hash == label_type_hash){
 			std::cout << std::any_cast<std::string>(value) << ' ';
 		}else if(value_type_hash == integer_type_hash){
 			std::cout << std::any_cast<std::int64_t>(value) << ' ';
 		}else if(value_type_hash == list_Type_hash){
-			dump_list(compare_hash,std::any_cast<impl::list_type>(value));
+			dump_list(compare_hash,std::any_cast<list_type>(value));
 		}else if(value_type_hash == dictionary_type_hash){
-			dump_content(std::any_cast<impl::dictionary_type>(value));
+			dump_content(std::any_cast<dictionary_type>(value));
 		}else{
 			__builtin_unreachable();
 		}
