@@ -1,8 +1,8 @@
 # bencode-parser
 
-<b>C++ Header only Bencode Parser.</b>
+<b>C++ Bencode parser</b>
 
-<b>Api:</b>
+<b>Api</b>
 <pre>
 bencode::result_type result = bencode::parse_file(file_path);
 or
@@ -11,18 +11,16 @@ bencode::result_type result = bencode::parse_content(content);
 bencode::dump_content(result);
 </pre>
 
-<b>Usage</b>
+<b>Usage</b><br>
 <pre>
-std::any_cast to the following types to extract the result from bencode::result_type
-
-std::string for labels
-std::int64_t for integers
-bencode::list_type for nested lists
-bencode::dictionary_type for nested dictionaries
-
-See the header file for more details
+See examples/example.cxx
 </pre>
-
+<b>Parsing Mode</b>
+<pre>
+Pass any of these enum constants to the functions mentioned in Api.<Br>
+<b>bencode::Parsing_Mode::Strict</b> (default) to consider any syntax error as fatal and throw.
+<b>bencode::Parsing_Mode::Relaxed</b> to ignore as many errors as possible.
+</pre>
 <b>Testing</b>
 <pre>
 git clone https://github.com/alyanser/bencode-parser
@@ -30,7 +28,7 @@ cd bencode-parser && mkdir build && cd build
 cmake .. && make && ./bencode-parser 
 </pre>
 
-<b>Sample output for a torrent file</b>
+<b>Sample output of bencode::dump_content for a torrent file</b>
 <pre>
 --- big-buck-bunny.torrent taken from https://webtorrent.io/free-torrents ---
 
