@@ -1,14 +1,14 @@
 #ifndef BENCODE_PARSER_HXX
 #define BENCODE_PARSER_HXX
 
+#include <any>
+#include <map>
 #include <fstream>
 #include <string>
-#include <map>
+#include <vector>
 #include <cassert>
 #include <utility>
-#include <any>
 #include <optional>
-#include <vector>
 #include <iostream>
 
 namespace bencode {
@@ -30,10 +30,10 @@ private:
 };
 
 /**
- * @brief Can be used to specify parsing strictness.
+ * @brief Used to specify parsing strictness.
  *
- * Strict : Do not tolerate any error. Reliable output.
- * Relaxed : Tolerate all possible errors. Might produce unrealible output.
+ * Strict : Do not tolerate any error in the given bencoding. Reliable output if any.
+ * Relaxed : Tolerate all possible errors. Unrealible output if any.
  */
 enum class Parsing_Mode { Strict, Relaxed };
 
@@ -46,9 +46,10 @@ using integer_result_type = std::optional<std::pair<std::int64_t,std::size_t>>;
 using label_result_type = std::optional<std::pair<std::string,std::size_t>>;
 using list_result_type = std::optional<std::pair<list_type,std::size_t>>;
 using dictionary_result_type = std::optional<std::pair<dictionary_type,std::size_t>>;
+using value_result_type = std::optional<std::pair<std::any,std::size_t>>;
 
 template<typename T>
-integer_result_type extract_integer(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
+integer_result_type extract_integer(T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'i'){
@@ -69,7 +70,7 @@ integer_result_type extract_integer(T && content,const std::size_t content_lengt
 		if(std::isdigit(content[idx])){
 			result *= 10;
 			result += content[idx] - '0';
-		}else if(mode == Parsing_Mode::Strict){
+		}else if(parsing_mode == Parsing_Mode::Strict){
 			throw bencode_error("Non-digits between 'i' and 'e'");
 		}
 	}
@@ -83,7 +84,7 @@ integer_result_type extract_integer(T && content,const std::size_t content_lengt
 }
 
 template<typename T>
-label_result_type extract_label(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
+label_result_type extract_label(T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(!std::isdigit(content[idx])){
@@ -96,12 +97,12 @@ label_result_type extract_label(T && content,const std::size_t content_length,co
 		if(std::isdigit(content[idx])){
 			label_length *= 10;
 			label_length += static_cast<std::size_t>(content[idx] - '0');
-		}else if(mode == Parsing_Mode::Strict){
+		}else if(parsing_mode == Parsing_Mode::Strict){
 			throw bencode_error("Invalid character inside label length");
 		}
 	}
 
-	if(idx >= content_length){
+	if(idx == content_length){
 		throw bencode_error("Label separator (:) was not found");
 	}
 
@@ -126,7 +127,32 @@ template<typename T>
 dictionary_result_type extract_dictionary(T && content,std::size_t content_length,Parsing_Mode mode,std::size_t idx);
 
 template<typename T>
-list_result_type extract_list(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
+list_result_type extract_list(T && content,std::size_t content_length,Parsing_Mode mode,std::size_t idx);
+
+template<typename T>
+value_result_type extract_value(T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t idx){
+
+	if(const auto integer_opt = extract_integer(std::forward<T>(content),content_length,parsing_mode,idx)){
+		return integer_opt;
+	}
+
+	if(const auto label_opt = extract_label(std::forward<T>(content),content_length,parsing_mode,idx)){
+		return label_opt;
+	}
+
+	if(const auto list_opt = extract_list(std::forward<T>(content),content_length,parsing_mode,idx)){
+		return list_opt;
+	}
+
+	if(const auto dictionary_opt = extract_dictionary(std::forward<T>(content),content_length,parsing_mode,idx)){
+		return dictionary_opt;
+	}
+
+	return {};
+}
+
+template<typename T>
+list_result_type extract_list(T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'l'){
@@ -139,28 +165,16 @@ list_result_type extract_list(T && content,const std::size_t content_length,cons
 		if(content[idx] == 'e'){
 			break;
 		}
-		
-		if(const auto integer_opt = extract_integer(std::forward<T>(content),content_length,mode,idx)){
-			const auto [integer,forward_idx] = integer_opt.value();
-			result.emplace_back(integer);
-			idx = forward_idx;
-		}else if(const auto label_opt = extract_label(std::forward<T>(content),content_length,mode,idx)){
-			auto & [label,forward_idx] = label_opt.value();
-			result.emplace_back(std::move(label));
-			idx = forward_idx;
-		}else if(const auto list_opt = extract_list(std::forward<T>(content),content_length,mode,idx)){
-			auto & [list,forward_idx] = list_opt.value();
-			result.emplace_back(std::move(list));
-			idx = forward_idx;
-		}else if(const auto dictionary_opt = extract_dictionary(std::forward<T>(content),content_length,mode,idx)){
-			auto & [dictionary,forward_idx] = dictionary_opt.value();
-			result.emplace_back(std::move(dictionary));
-			idx = forward_idx;
-		}else{
-			if(mode == Parsing_Mode::Relaxed){
-				break;
-			}
 
+		auto value_opt = extract_value(std::forward<T>(content),content_length,parsing_mode,idx);
+
+		if(value_opt.has_value()){
+			auto & [value,forward_idx] = value_opt.value();
+			result.emplace_back(std::move(value));
+			idx = forward_idx;
+		}else if(parsing_mode == Parsing_Mode::Relaxed){
+			break;
+		}else{
 			return {};
 		}
 	}
@@ -169,7 +183,7 @@ list_result_type extract_list(T && content,const std::size_t content_length,cons
 }
 
 template<typename T>
-dictionary_result_type extract_dictionary(T && content,const std::size_t content_length,const Parsing_Mode mode,std::size_t idx){
+dictionary_result_type extract_dictionary(T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t idx){
 	assert(idx < content_length);
 
 	if(content[idx] != 'd'){
@@ -183,10 +197,10 @@ dictionary_result_type extract_dictionary(T && content,const std::size_t content
 			break;
 		}
 		
-		const auto key_opt = extract_label(std::forward<T>(content),content_length,mode,idx);
+		const auto key_opt = extract_label(std::forward<T>(content),content_length,parsing_mode,idx);
 
 		if(!key_opt.has_value()){
-			if(mode == Parsing_Mode::Relaxed){
+			if(parsing_mode == Parsing_Mode::Relaxed){
 				break;
 			}
 
@@ -196,27 +210,15 @@ dictionary_result_type extract_dictionary(T && content,const std::size_t content
 		auto & [key,key_forward_idx] = key_opt.value();
 		idx = key_forward_idx;
 
-		if(const auto integer_opt = extract_integer(std::forward<T>(content),content_length,mode,idx)){
-			const auto [integer,forward_idx] = integer_opt.value();
-			result.emplace(std::move(key),integer);
-			idx = forward_idx;
-		}else if(const auto label_opt = extract_label(std::forward<T>(content),content_length,mode,idx)){
-			auto & [label,forward_idx] = label_opt.value();
-			result.emplace(std::move(key),std::move(label));
-			idx = forward_idx;
-		}else if(const auto list_opt = extract_list(std::forward<T>(content),content_length,mode,idx)){
-			auto & [list,forward_idx] = list_opt.value();
-			result.emplace(std::move(key),std::move(list));
-			idx = forward_idx;
-		}else if(const auto dictionary_opt = extract_dictionary(std::forward<T>(content),content_length,mode,idx)){
-			auto & [dictionary,forward_idx] = dictionary_opt.value();
-			result.emplace(std::move(key),std::move(dictionary));
-			idx = forward_idx;
-		}else{
-			if(mode == Parsing_Mode::Relaxed){
-				break;
-			}
+		auto value_opt = extract_value(std::forward<T>(content),content_length,parsing_mode,idx);
 
+		if(value_opt.has_value()){
+			auto & [value,forward_idx] = value_opt.value();
+			result.emplace(std::move(key),std::move(value));
+			idx = forward_idx;
+		}else if(parsing_mode == Parsing_Mode::Relaxed){
+			break;
+		}else{
 			return {};
 		}
 	}
@@ -231,8 +233,8 @@ using result_type = impl::dictionary_type;
 /**
  * @brief Parses the bencoded file contents and returns decoded keys mapped to corresponding values.
  *
- * @param content Contents of the bencoded file.
- * @param parsing_mode Parsing strictness specifier.. 
+ * @param content Content of the bencoded file.
+ * @param parsing_mode Parsing strictness specifier.
  * @return result_type :- [dictionary_titles,values].
  */
 template<typename T>
@@ -241,6 +243,7 @@ result_type parse_content(T && content,const Parsing_Mode parsing_mode = Parsing
 
 	if(const auto dict_opt = impl::extract_dictionary(std::forward<T>(content),content_length,parsing_mode,0)){
 		auto & [dict,forward_idx] = dict_opt.value();
+		std::cerr << "valid";
 		return std::move(dict);
 	}
 
@@ -274,15 +277,17 @@ result_type parse_file(T && file_path,const Parsing_Mode parsing_mode = Parsing_
  * 
  * @param parsed_dict Parsed bencoded file contents returned by bencode::parse_file or bencode::parse_content.
  */
-inline void print(const std::map<std::string,std::any> & parsed_dictionary) noexcept {
+inline void dump_content(const std::map<std::string,std::any> & parsed_dictionary) noexcept {
 
-	auto print_list = [](auto compare_hash,const auto & list){
+	std::string printable_dict;
+
+	auto dump_list = [](auto compare_hash,const auto & list){
 		for(const auto & value : list){
 			compare_hash(compare_hash,value,value.type().hash_code());
 		}
 	};
 
-	auto compare_hash = [print_list](auto compare_hash,const auto & value,const auto value_type_hash) -> void {
+	auto compare_hash = [dump_list](auto compare_hash,const auto & value,const auto value_type_hash) -> void {
 		const static auto label_type_hash = typeid(std::string).hash_code();
 		const static auto integer_type_hash = typeid(std::int64_t).hash_code();
 		const static auto list_Type_hash = typeid(impl::list_type).hash_code();
@@ -293,19 +298,19 @@ inline void print(const std::map<std::string,std::any> & parsed_dictionary) noex
 		}else if(value_type_hash == integer_type_hash){
 			std::cout << std::any_cast<std::int64_t>(value) << ' ';
 		}else if(value_type_hash == list_Type_hash){
-			print_list(compare_hash,std::any_cast<impl::list_type>(value));
+			dump_list(compare_hash,std::any_cast<impl::list_type>(value));
 		}else if(value_type_hash == dictionary_type_hash){
-			print(std::any_cast<impl::dictionary_type>(value));
+			dump_content(std::any_cast<impl::dictionary_type>(value));
 		}else{
 			__builtin_unreachable();
 		}
 	};
 		
-	for(const auto & [dict_key,value] : parsed_dictionary){
-		std::cout << dict_key << "  :  ";
+	for(const auto & [dictionary_key,value] : parsed_dictionary){
+		std::cout << dictionary_key << "  :  ";
 
-		if(dict_key == "pieces"){
-			std::cout << "long non-ascii characters (present in dictionary but not being printed)";
+		if(dictionary_key == "pieces"){
+			std::cout << "possibly long non-ascii characters (present in dictionary but not being printed)";
 		}else{
 			compare_hash(compare_hash,value,value.type().hash_code());
 		}
