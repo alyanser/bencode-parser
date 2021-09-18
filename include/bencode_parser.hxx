@@ -104,8 +104,6 @@ result_type parse_file(T && file_path,const Parsing_Mode parsing_mode = Parsing_
  */
 inline void dump_content(const std::map<std::string,std::any> & parsed_content) noexcept {
 
-	std::string printable_dict;
-
 	auto dump_list = [](auto compare_hash,const auto & list){
 		for(const auto & value : list){
 			compare_hash(compare_hash,value,value.type().hash_code());

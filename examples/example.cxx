@@ -1,7 +1,7 @@
 #include "bencode_parser.hxx"
 
 int main(){
-	const auto result = bencode::parse_file("../examples/sample-input/big-buck-bunny.torrent");
+	const auto result = bencode::parse_file("../examples/sample-input/sintel.torrent");
 	const auto metadata = bencode::extract_metadata(result);
 
 	std::cout << "Name : " << metadata.name << '\n';
