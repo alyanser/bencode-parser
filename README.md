@@ -8,6 +8,7 @@ bencode::result_type result = bencode::parse_file(file_path);
 or
 bencode::result_type result = bencode::parse_content(content);
 
+bencode::Metadata metadata = bencode::extract_metadata(result);
 bencode::dump_content(result);
 </pre>
 
@@ -34,23 +35,22 @@ cd bencode-parser && mkdir build && cd build
 cmake .. && make && ./bencode-parser 
 </pre>
 
-<b>Sample output of bencode::dump_content for a torrent file</b>
+<b>Sample metadata result returned by bencode::extract_metadata</b>
 <pre>
 --- big-buck-bunny.torrent taken from https://webtorrent.io/free-torrents ---
 
-announce  :  udp://tracker.leechers-paradise.org:6969
-announce-list  :  udp://tracker.leechers-paradise.org:6969 udp://tracker.coppersurfer.tk:6969
-comment  :  WebTorrent <https://webtorrent.io>
-created by  :  WebTorrent <https://webtorrent.io>
-creation date  :  1490916601
-encoding  :  UTF-8
-info  :  files  :  length  :  140
-path  :  Big Buck Bunny.en.srt 
-length  :  276134947
-path  :  Big Buck Bunny.mp4 
-length  :  310380
-path  :  poster.jpg 
-name  :  Big Buck Bunny
-piece length  :  262144
-pieces  :  possibly long non-ascii characters (present in actual dict but not being printed)
+Name : Big Buck Bunny
+Announce : udp://tracker.leechers-paradise.org:6969
+Created by : WebTorrent <https://webtorrent.io>
+Creation date : 1490916601
+Comment : WebTorrent <https://webtorrent.io>
+Encoding : UTF-8
+Piece length : 262144
+Announce list : udp://tracker.leechers-paradise.org:6969 udp://tracker.coppersurfer.tk:6969 ...
+Files information:
+	Path : Big Buck Bunny.en.srt	Size : 140
+	Path : Big Buck Bunny.mp4	Size : 276134947
+	Path : poster.jpg	Size : 310380
+  
+...
 </pre>
