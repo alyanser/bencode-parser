@@ -8,12 +8,12 @@ bencode::result_type result = bencode::parse_file(file_path);
 or
 bencode::result_type result = bencode::parse_content(content);
 
-bencode::print(result);
+bencode::dump_content(result);
 </pre>
 
 <b>Usage</b>
 <pre>
-std::any_cast the following types to extract the result from bencode::result_type
+std::any_cast to the following types to extract the result from bencode::result_type
 
 std::string for labels
 std::int64_t for integers
@@ -27,7 +27,7 @@ See the header file for more details
 <pre>
 git clone https://github.com/alyanser/bencode-parser
 cd bencode-parser && mkdir build && cd build 
-cmake .. && make && ./bencode-parser
+cmake .. && make && ./bencode-parser 
 </pre>
 
 <b>Sample output for a torrent file</b>
@@ -35,7 +35,7 @@ cmake .. && make && ./bencode-parser
 --- big-buck-bunny.torrent taken from https://webtorrent.io/free-torrents ---
 
 announce  :  udp://tracker.leechers-paradise.org:6969
-announce-list  :  udp://tracker.leechers-paradise.org:6969 udp://tracker.coppersurfer.tk:6969
+announce-list  :  udp://tracker.leechers-paradise.org:6969 udp://tracker.coppersurfer.tk:6969 ...
 comment  :  WebTorrent <https://webtorrent.io>
 created by  :  WebTorrent <https://webtorrent.io>
 creation date  :  1490916601
@@ -48,5 +48,5 @@ length  :  310380
 path  :  poster.jpg 
 name  :  Big Buck Bunny
 piece length  :  262144
-pieces  :  long non-ascii characters (present in actual dict but not being printed)
+pieces  :  possibly long non-ascii characters (present in actual dict but not being printed)
 </pre>
