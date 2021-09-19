@@ -9,6 +9,7 @@ or
 bencode::result_type result = bencode::parse_content(content);
 
 bencode::Metadata metadata = bencode::extract_metadata(result);
+or
 bencode::dump_content(result);
 </pre>
 
