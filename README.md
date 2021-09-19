@@ -4,20 +4,20 @@
 
 <b>Api</b>
 <pre>
-bencode::result_type result = bencode::parse_file(path_to_bencoded_file)
-or
-bencode::result_type result = bencode::parse_content(bencoded_content)
+bencode::result_type = bencode::parse_file(path_to_bencoded_file)
+bencode::result_type = bencode::parse_content(bencoded_content)
 
-bencode::Metadata metadata = bencode::extract_metadata(result)
+bencode::Metadata = bencode::extract_metadata(bencode::result_type)
 
-// utility
-std::string decoded_str = bencode::convert_to_string(metadata) // useful for regex
-bencode::dump_content(result)
+// utility - useful for regex/grep
 
-See the header file for more details
+std::string = bencode::convert_to_string(bencode::Metadata) // standard compliant
+std::string = bencode::convert_to_string(bencode::result_type) // may contain non standard dictionary values
+
+// See the header file for more details about the types
 </pre>
 
-<b>Usage</b><br>
+<b>Examples</b><br>
 <pre>
 See examples/example.cxx
 </pre>
@@ -31,7 +31,7 @@ Just include bencode_parser.hxx
 <pre>
 Pass any of these enum constants to the functions mentioned in Api.<Br>
 <b>bencode::Parsing_Mode::Strict</b> (default) to consider any syntax error as fatal and throw.
-<b>bencode::Parsing_Mode::Relaxed</b> to ignore as many errors as possible.
+<b>bencode::Parsing_Mode::Lenient</b> to ignore as many errors as possible.
 </pre>
 <b>Testing</b>
 <pre>
