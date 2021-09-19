@@ -144,22 +144,54 @@ inline void dump_content(const std::map<std::string,std::any> & parsed_content) 
 
 struct Metadata {
 	std::vector<std::pair<std::string,std::int64_t>> file_info; // [file_path,file_size]
-	std::vector<std::string> announce_list;
+	std::vector<std::string> announce_url_list;
 	std::string name;
-	std::string announce;
+	std::string announce_url;
 	std::string created_by;
 	std::string creation_date;
 	std::string comment;
 	std::string encoding;
 	std::string pieces;
-	std::int64_t length = 0;
+	std::string md5sum;
 	std::int64_t piece_length = 0;
+	std::int64_t single_file_size = 0;
+	std::int64_t multiple_files_size = 0;
+	bool single_file = true;
 };
 
 namespace impl {
-	void extract_info_dictionary(const dictionary & info_dictionary,Metadata & metadata);
-	std::vector<std::string> extract_announce_list(const list & parsed_list);
+	void extract_info_dictionary(const dictionary & info_dictionary,Metadata & metadata) noexcept;
+	std::vector<std::string> extract_announce_list(const list & parsed_list) noexcept;
 } // namespace impl
+
+[[nodiscard]]
+std::string convert_to_string(const Metadata & metadata) noexcept {
+	std::string metadata_str;
+
+	using namespace std::string_literals;
+
+	metadata_str += "- Name : \n\n" + metadata.name + "\n\n";
+	metadata_str += "- Content type : \n\n"s + (metadata.single_file ? "Single file" : "Directory") + "\n\n";
+	metadata_str += "- Total Size \n\n";
+	metadata_str += std::to_string((metadata.single_file ? metadata.single_file_size : metadata.multiple_files_size)) + "\n\n";
+	metadata_str += "- Announce URL : \n\n" + metadata.announce_url + "\n\n";
+	metadata_str += "- Created by : \n\n" + metadata.created_by + "\n\n";
+	metadata_str += "- Creation date : \n\n" + metadata.creation_date + "\n\n";
+	metadata_str += "- Comment : \n\n" + metadata.comment + "\n\n";
+	metadata_str += "- Encoding : \n\n" + metadata.encoding + "\n\n";
+	metadata_str += "- Piece length : \n\n" + std::to_string(metadata.piece_length) + "\n\n";
+	metadata_str += "- Announce list : \n\n";
+
+	for(const auto & announce_url : metadata.announce_url_list){
+		metadata_str += announce_url;
+	}
+
+	metadata_str += "\n\nFiles information:\n\n";
+
+	for(const auto & [file_path,file_size] : metadata.file_info){
+		metadata_str += "\tPath : " + file_path + "\tSize : " + std::to_string(file_size) + " bytes\n";
+	}
+}
 
 /**
  * @brief Extracts metadata from the parsed contents.
@@ -168,7 +200,7 @@ namespace impl {
  * @return Metadata : Metadata consiting of most common bencode dictionary headers
  */
 [[nodiscard]] 
-inline Metadata extract_metadata(const dictionary & parsed_content){
+inline Metadata extract_metadata(const dictionary & parsed_content) noexcept {
 	Metadata metadata;
 	
 	for(const auto & [dict_key,value] : parsed_content){
@@ -179,18 +211,18 @@ inline Metadata extract_metadata(const dictionary & parsed_content){
 		}else if(dict_key == "encoding"){
 			metadata.encoding = std::any_cast<std::string>(value);
 		}else if(dict_key == "announce"){
-			metadata.announce = std::any_cast<std::string>(value);
+			metadata.announce_url = std::any_cast<std::string>(value);
 		}else if(dict_key == "comment"){
 			metadata.comment = std::any_cast<std::string>(value);
-		}else if(dict_key == "length"){
-			metadata.length = std::any_cast<std::int64_t>(value);
 		}else if(dict_key == "announce-list"){
-			metadata.announce_list = impl::extract_announce_list(std::any_cast<list>(value));
+			metadata.announce_url_list = impl::extract_announce_list(std::any_cast<list>(value));
 		}else if(dict_key == "info"){
 			impl::extract_info_dictionary(std::any_cast<dictionary>(value),metadata);
+		}else{
+			__builtin_unreachable();
 		}
 	}
-	
+
 	return metadata;
 }
 
@@ -233,6 +265,11 @@ integer_result extract_integer(T && content,const std::size_t content_length,con
 	}
 
 	assert(content[idx] == 'e');
+
+	if(!result && negative){
+		throw bencode_error("Invalid integer value (i-0e)");
+	}
+
 	return negative ? std::make_pair(-result,idx + 1) : std::make_pair(result,idx + 1);
 }
 
@@ -378,9 +415,8 @@ dictionary_result extract_dictionary(T && content,const std::size_t content_leng
 }
 
 [[nodiscard]]
-inline std::vector<std::string> extract_announce_list(const list & parsed_list){
+inline std::vector<std::string> extract_announce_list(const list & parsed_list) noexcept {
 	std::vector<std::string> announce_list;
-
 	announce_list.reserve(parsed_list.size());
 
 	for(const auto & nested_list : parsed_list){
@@ -392,35 +428,51 @@ inline std::vector<std::string> extract_announce_list(const list & parsed_list){
 	return announce_list;
 }
 
-inline void extract_files_info(const list & file_info_list,Metadata & metadata){
+inline void extract_files_info(const list & file_info_list,Metadata & metadata) noexcept {
 
 	for(const auto & file_info_dict : std::any_cast<list>(file_info_list)){
 		metadata.file_info.emplace_back();
+
 		auto & [file_path,file_length] = metadata.file_info.back();
 
 		for(const auto & [file_key,file_value] : std::any_cast<dictionary>(file_info_dict)){
 			assert(file_key == "length" || file_key == "path");
+
 			if(file_key == "length"){
 				file_length = std::any_cast<std::int64_t>(file_value);
 			}else{
 				const auto extracted_file_path = std::any_cast<list>(file_value);
-				assert(extracted_file_path.size() == 1);
-				file_path = std::any_cast<std::string>(extracted_file_path.front());
+
+				for(const auto & file_or_dir : extracted_file_path){
+					file_path += std::any_cast<std::string>(file_or_dir) + '/';
+				}
+
+				if(!file_path.empty()){
+					file_path.pop_back(); // '/'
+				}
 			}
 		}
+
+		metadata.multiple_files_size += file_length;
 	}
 }
 
-inline void extract_info_dictionary(const dictionary & info_dictionary,Metadata & metadata){
+inline void extract_info_dictionary(const dictionary & info_dictionary,Metadata & metadata) noexcept {
 
 	for(const auto & [info_key,value] : info_dictionary){
+
 		if(info_key == "name"){
 			metadata.name = std::any_cast<std::string>(value);
+		}else if(info_key == "length"){
+			metadata.single_file_size = std::any_cast<std::int64_t>(value);
 		}else if(info_key == "piece length"){
 			metadata.piece_length = std::any_cast<std::int64_t>(value);
 		}else if(info_key == "pieces"){
 			metadata.pieces = std::any_cast<std::string>(value);
+		}else if(info_key == "md5sum"){
+			metadata.md5sum = std::any_cast<std::string>(value);
 		}else if(info_key == "files"){
+			metadata.single_file = false;
 			extract_files_info(std::any_cast<list>(value),metadata);
 		}else{
 			std::cerr << info_key << " not recognized\n";
