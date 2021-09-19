@@ -164,33 +164,41 @@ namespace impl {
 	std::vector<std::string> extract_announce_list(const list & parsed_list) noexcept;
 } // namespace impl
 
+/**
+ * @brief Converts the conents of metadata into string format. Intended to be used for regex.
+ * 
+ * @param metadata : Instance returned by bencode::extract_metadata.
+ * @return std::string : Result of conversion.
+ */
 [[nodiscard]]
-std::string convert_to_string(const Metadata & metadata) noexcept {
-	std::string metadata_str;
+inline std::string convert_to_string(const Metadata & metadata) noexcept {
+	std::string str_fmt;
 
 	using namespace std::string_literals;
 
-	metadata_str += "- Name : \n\n" + metadata.name + "\n\n";
-	metadata_str += "- Content type : \n\n"s + (metadata.single_file ? "Single file" : "Directory") + "\n\n";
-	metadata_str += "- Total Size \n\n";
-	metadata_str += std::to_string((metadata.single_file ? metadata.single_file_size : metadata.multiple_files_size)) + "\n\n";
-	metadata_str += "- Announce URL : \n\n" + metadata.announce_url + "\n\n";
-	metadata_str += "- Created by : \n\n" + metadata.created_by + "\n\n";
-	metadata_str += "- Creation date : \n\n" + metadata.creation_date + "\n\n";
-	metadata_str += "- Comment : \n\n" + metadata.comment + "\n\n";
-	metadata_str += "- Encoding : \n\n" + metadata.encoding + "\n\n";
-	metadata_str += "- Piece length : \n\n" + std::to_string(metadata.piece_length) + "\n\n";
-	metadata_str += "- Announce list : \n\n";
+	str_fmt += "- Name : \n\n" + metadata.name + "\n\n";
+	str_fmt += "- Content type : \n\n"s + (metadata.single_file ? "Single file" : "Directory") + "\n\n";
+	str_fmt += "- Total Size \n\n";
+	str_fmt += std::to_string((metadata.single_file ? metadata.single_file_size : metadata.multiple_files_size)) + "\n\n";
+	str_fmt += "- Announce URL : \n\n" + metadata.announce_url + "\n\n";
+	str_fmt += "- Created by : \n\n" + metadata.created_by + "\n\n";
+	str_fmt += "- Creation date : \n\n" + metadata.creation_date + "\n\n";
+	str_fmt += "- Comment : \n\n" + metadata.comment + "\n\n";
+	str_fmt += "- Encoding : \n\n" + metadata.encoding + "\n\n";
+	str_fmt += "- Piece length : \n\n" + std::to_string(metadata.piece_length) + "\n\n";
+	str_fmt += "- Announce list : \n\n";
 
 	for(const auto & announce_url : metadata.announce_url_list){
-		metadata_str += announce_url;
+		str_fmt += announce_url;
 	}
 
-	metadata_str += "\n\nFiles information:\n\n";
+	str_fmt += "\n\nFiles information:\n\n";
 
 	for(const auto & [file_path,file_size] : metadata.file_info){
-		metadata_str += "\tPath : " + file_path + "\tSize : " + std::to_string(file_size) + " bytes\n";
+		str_fmt += "\tPath : " + file_path + "\tSize : " + std::to_string(file_size) + " bytes\n";
 	}
+
+	return str_fmt;
 }
 
 /**
