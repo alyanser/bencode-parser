@@ -1,5 +1,5 @@
 /**
- * Considers this specification as standard : https://wiki.theory.org/BitTorrentSpecification#Tracker_HTTP.2FHTTPS_Protocol
+ * Considers this specification as standard : https://wiki.theory.org/BitTorrentSpecification
  */
 
 #ifndef BENCODE_PARSER_HXX
@@ -506,9 +506,6 @@ inline void extract_info_dictionary(const dictionary & info_dictionary,Metadata 
 		}else if(info_key == "files"){
 			metadata.single_file = false;
 			extract_files_info(std::any_cast<list>(value),metadata);
-		}else{
-			//! private
-			std::cerr << info_key << " not recognized by bencode parser\n";
 		}
 	}
 }
