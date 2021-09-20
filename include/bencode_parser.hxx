@@ -168,6 +168,7 @@ inline std::string convert_to_string(const std::map<std::string,std::any> & pars
 struct Metadata {
 	std::vector<std::pair<std::string,std::int64_t>> file_info; // [file_path,file_size : bytes]
 	std::vector<std::string> announce_url_list;
+	std::vector<std::string> peers; // binary model
 	std::string name;
 	std::string announce_url;
 	std::string created_by;
@@ -197,9 +198,9 @@ namespace impl {
  */
 [[nodiscard]]
 inline std::string convert_to_string(const Metadata & metadata,const std::string_view delimeter = "\n\n") noexcept {
-	std::string str_fmt;
-
 	using namespace std::string_literals;
+
+	std::string str_fmt;
 
 	str_fmt += "- Name : \n\n" + metadata.name + delimeter.data();
 	str_fmt += "- Content type : \n\n"s + (metadata.single_file ? "Single file" : "Directory") + delimeter.data();
@@ -236,6 +237,7 @@ inline Metadata extract_metadata(const dictionary & parsed_content) noexcept {
 	Metadata metadata;
 	
 	for(const auto & [dict_key,value] : parsed_content){
+
 		if(dict_key == "creation date"){
 			metadata.creation_date = std::to_string(std::any_cast<std::int64_t>(value));
 		}else if(dict_key == "created by"){
@@ -251,7 +253,7 @@ inline Metadata extract_metadata(const dictionary & parsed_content) noexcept {
 		}else if(dict_key == "info"){
 			impl::extract_info_dictionary(std::any_cast<dictionary>(value),metadata);
 		}else{
-			__builtin_unreachable();
+			std::cerr << dict_key << " not recognized by bencode parser\n";
 		}
 	}
 
@@ -284,6 +286,7 @@ integer_result extract_integer(Bencoded && content,const std::size_t content_len
 	std::int64_t result = 0;
 
 	for(;index < content_length && content[index] != 'e';++index){
+
 		if(std::isdigit(content[index])){
 			result *= 10;
 			result += content[index] - '0';
@@ -317,6 +320,7 @@ label_result extract_label(Bencoded && content,const std::size_t content_length,
 	std::size_t label_length = 0;
 
 	for(;index < content_length && content[index] != ':';index++){
+
 		if(std::isdigit(content[index])){
 			label_length *= 10;
 			label_length += static_cast<std::size_t>(content[index] - '0');
@@ -335,11 +339,7 @@ label_result extract_label(Bencoded && content,const std::size_t content_length,
 	std::string result;
 	result.reserve(label_length);
 
-	while(label_length--){
-		if(index == content_length){
-			break;
-		}
-
+	while(index < content_length && label_length--){
 		result += content[index++];
 	}
 
@@ -380,11 +380,7 @@ list_result extract_list(Bencoded && content,const std::size_t content_length,co
 
 	std::vector<std::any> result;
 
-	for(++index;index < content_length;){
-		if(content[index] == 'e'){
-			break;
-		}
-
+	for(++index;index < content_length && content[index] != 'e';){
 		auto value_opt = extract_value(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
 		if(value_opt.has_value()){
@@ -412,11 +408,7 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 
 	std::map<std::string,std::any> result;
 
-	for(++index;index < content_length;){
-		if(content[index] == 'e'){
-			break;
-		}
-		
+	for(++index;index < content_length && content[index] != 'e';){
 		const auto key_opt = extract_label(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
 		if(!key_opt.has_value()){
@@ -426,6 +418,7 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 
 			throw bencode_error("Invalid or non-existent dictionary key");
 		}
+
 
 		auto & [key,key_forward_index] = key_opt.value();
 		index = key_forward_index;
@@ -506,6 +499,8 @@ inline void extract_info_dictionary(const dictionary & info_dictionary,Metadata 
 		}else if(info_key == "files"){
 			metadata.single_file = false;
 			extract_files_info(std::any_cast<list>(value),metadata);
+		}else{
+			std::cerr << info_key << " info_key not recognized by parser\n";
 		}
 	}
 }
