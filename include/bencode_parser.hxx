@@ -34,9 +34,9 @@ private:
 	std::string_view what_;
 };
 
-using result_type = std::map<std::string,std::any>;
-using dictionary = result_type;
+using dictionary = std::map<std::string,std::any>;
 using list = std::vector<std::any>;
+using result_type = dictionary;
 
 /**
  * @brief Can be used to specify parsing strictness.
