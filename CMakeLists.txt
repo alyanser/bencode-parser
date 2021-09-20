@@ -11,8 +11,7 @@ set(CXX_FLAGS "-pipe -pedantic -Wall -Wextra -Wshadow -Wdouble-promotion -Wcast-
 set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=undefined,address ${CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG ${CXX_FLAGS}")
 
-# add_executable(${PROJECT_NAME} examples/example.cxx)
-add_executable(${PROJECT_NAME} test.cxx)
+add_executable(${PROJECT_NAME} examples/example.cxx)
 
 include_directories(
          "include"
