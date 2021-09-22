@@ -25,13 +25,18 @@ class bencode_error : public std::exception {
 public:
 	using exception::exception;
 
-	explicit bencode_error(const std::string_view error) : what_(error){}
+	explicit bencode_error(const std::string_view error,const std::size_t error_index = 0) : what_(error), error_index_(error_index){}
 
 	[[nodiscard]] const char * what() const noexcept override {
 		return what_.data();
 	}
+
+	[[nodiscard]] auto error_index() const noexcept {
+		return error_index_;
+	}
 private:
 	std::string_view what_;
+	std::size_t error_index_ = 0;
 };
 
 using dictionary = std::map<std::string,std::any>;
@@ -51,11 +56,11 @@ namespace impl {
 using list_result = std::optional<std::pair<list,std::size_t>>;
 using dictionary_result = std::optional<std::pair<dictionary,std::size_t>>;
 
-template<typename Bencoded>
-dictionary_result extract_dictionary(Bencoded && content,std::size_t content_length,Parsing_Mode parsing_mode,std::size_t index);
+template<typename Bencoded_T>
+dictionary_result extract_dictionary(Bencoded_T && content,std::size_t content_length,Parsing_Mode parsing_mode,std::size_t index);
 
-template<typename Bencoded>
-list_result extract_list(Bencoded && content,std::size_t content_length,Parsing_Mode mode,std::size_t index);
+template<typename Bencoded_T>
+list_result extract_list(Bencoded_T && content,std::size_t content_length,Parsing_Mode mode,std::size_t index);
 
 } // namespace impl
 
@@ -66,16 +71,16 @@ list_result extract_list(Bencoded && content,std::size_t content_length,Parsing_
  * @param parsing_mode Parsing strictness specifier.
  * @return result_type :- [dictionary_titles,values].
  */
-template<typename Bencoded>
+template<typename Bencoded_T>
 [[nodiscard]] 
-result_type parse_content(Bencoded && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
+result_type parse_content(Bencoded_T && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
 	const auto content_length = std::size(content);
 
 	if(!content_length){
 		throw bencode_error("expects non-empty input");
 	}
 
-	if(const auto dict_opt = impl::extract_dictionary(std::forward<Bencoded>(content),content_length,parsing_mode,0)){
+	if(const auto dict_opt = impl::extract_dictionary(std::forward<Bencoded_T>(content),content_length,parsing_mode,0)){
 		auto & [dict,forward_index] = dict_opt.value();
 		return std::move(dict);
 	}
@@ -166,9 +171,6 @@ inline std::string convert_to_string(const std::map<std::string,std::any> & pars
  * @brief Metadata containing content of standard-compliaint dictionary keys. Returned from bencode::extract_content
  */
 struct Metadata {
-	std::vector<std::pair<std::string,std::int64_t>> file_info; // [file_path,file_size : bytes]
-	std::vector<std::string> announce_url_list;
-	std::vector<std::string> peers; // binary model
 	std::string name;
 	std::string announce_url;
 	std::string created_by;
@@ -177,6 +179,9 @@ struct Metadata {
 	std::string encoding;
 	std::string pieces;
 	std::string md5sum;
+	std::vector<std::pair<std::string,std::int64_t>> file_info; // [file_path,file_size : bytes]
+	std::vector<std::string> announce_url_list;
+	std::vector<std::string> peers; // binary model
 	std::int64_t piece_length = 0;
 	std::int64_t single_file_size = 0;
 	std::int64_t multiple_files_size = 0;
@@ -252,8 +257,6 @@ inline Metadata extract_metadata(const dictionary & parsed_content) noexcept {
 			metadata.announce_url_list = impl::extract_announce_list(std::any_cast<list>(value));
 		}else if(dict_key == "info"){
 			impl::extract_info_dictionary(std::any_cast<dictionary>(value),metadata);
-		}else{
-			std::cerr << dict_key << " not recognized by bencode parser\n";
 		}
 	}
 
@@ -266,9 +269,9 @@ using integer_result = std::optional<std::pair<std::int64_t,std::size_t>>;
 using label_result = std::optional<std::pair<std::string,std::size_t>>;
 using value_result = std::optional<std::pair<std::any,std::size_t>>;
 
-template<typename Bencoded>
+template<typename Bencoded_T>
 [[nodiscard]]
-integer_result extract_integer(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+integer_result extract_integer(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 	assert(index < content_length);
 
 	if(content[index] != 'i'){
@@ -278,7 +281,7 @@ integer_result extract_integer(Bencoded && content,const std::size_t content_len
 	constexpr std::string_view ending_not_found("Ending character ('e') not found for integral value");
 
 	if(++index == content_length){
-		throw bencode_error(ending_not_found.data());
+		throw bencode_error(ending_not_found.data(),index);
 	}
 
 	const bool negative = content[index] == '-';
@@ -291,26 +294,26 @@ integer_result extract_integer(Bencoded && content,const std::size_t content_len
 			result *= 10;
 			result += content[index] - '0';
 		}else if(parsing_mode == Parsing_Mode::Strict){
-			throw bencode_error("Non-digits between 'i' and 'e'");
+			throw bencode_error("Non-digits between 'i' and 'e'",index);
 		}
 	}
 
 	if(index == content_length){
-		throw bencode_error(ending_not_found.data());
+		throw bencode_error(ending_not_found.data(),index);
 	}
 
 	assert(content[index] == 'e');
 
 	if(!result && negative){
-		throw bencode_error("Invalid integer value (i-0e)");
+		throw bencode_error("Invalid integer value (i-0e)",index);
 	}
 
 	return negative ? std::make_pair(-result,index + 1) : std::make_pair(result,index + 1);
 }
 
-template<typename Bencoded>
+template<typename Bencoded_T>
 [[nodiscard]]
-label_result extract_label(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+label_result extract_label(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 	assert(index < content_length);
 
 	if(!std::isdigit(content[index])){
@@ -325,12 +328,12 @@ label_result extract_label(Bencoded && content,const std::size_t content_length,
 			label_length *= 10;
 			label_length += static_cast<std::size_t>(content[index] - '0');
 		}else if(parsing_mode == Parsing_Mode::Strict){
-			throw bencode_error("Invalid character inside label length");
+			throw bencode_error("Invalid character inside label length",index);
 		}
 	}
 
 	if(index == content_length){
-		throw bencode_error("Label separator (:) was not found");
+		throw bencode_error("Label separator (:) was not found",index);
 	}
 
 	assert(content[index] == ':');
@@ -346,32 +349,32 @@ label_result extract_label(Bencoded && content,const std::size_t content_length,
 	return std::make_pair(std::move(result),index);
 }
 
-template<typename Bencoded>
+template<typename Bencoded_T>
 [[nodiscard]]
-value_result extract_value(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+value_result extract_value(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 
-	if(const auto integer_opt = extract_integer(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
+	if(const auto integer_opt = extract_integer(std::forward<Bencoded_T>(content),content_length,parsing_mode,index)){
 		return integer_opt;
 	}
 
-	if(const auto label_opt = extract_label(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
+	if(const auto label_opt = extract_label(std::forward<Bencoded_T>(content),content_length,parsing_mode,index)){
 		return label_opt;
 	}
 
-	if(const auto list_opt = extract_list(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
+	if(const auto list_opt = extract_list(std::forward<Bencoded_T>(content),content_length,parsing_mode,index)){
 		return list_opt;
 	}
 
-	if(const auto dictionary_opt = extract_dictionary(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
+	if(const auto dictionary_opt = extract_dictionary(std::forward<Bencoded_T>(content),content_length,parsing_mode,index)){
 		return dictionary_opt;
 	}
 
 	return {};
 }
 
-template<typename Bencoded>
+template<typename Bencoded_T>
 [[nodiscard]]
-list_result extract_list(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+list_result extract_list(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 	assert(index < content_length);
 
 	if(content[index] != 'l'){
@@ -381,7 +384,7 @@ list_result extract_list(Bencoded && content,const std::size_t content_length,co
 	std::vector<std::any> result;
 
 	for(++index;index < content_length && content[index] != 'e';){
-		auto value_opt = extract_value(std::forward<Bencoded>(content),content_length,parsing_mode,index);
+		auto value_opt = extract_value(std::forward<Bencoded_T>(content),content_length,parsing_mode,index);
 
 		if(value_opt.has_value()){
 			auto & [value,forward_index] = value_opt.value();
@@ -397,9 +400,9 @@ list_result extract_list(Bencoded && content,const std::size_t content_length,co
 	return std::make_pair(std::move(result),index + 1);
 }
 
-template<typename Bencoded>
+template<typename Bencoded_T>
 [[nodiscard]]
-dictionary_result extract_dictionary(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+dictionary_result extract_dictionary(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 	assert(index < content_length);
 
 	if(content[index] != 'd'){
@@ -409,21 +412,21 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 	std::map<std::string,std::any> result;
 
 	for(++index;index < content_length && content[index] != 'e';){
-		const auto key_opt = extract_label(std::forward<Bencoded>(content),content_length,parsing_mode,index);
+		const auto key_opt = extract_label(std::forward<Bencoded_T>(content),content_length,parsing_mode,index);
 
 		if(!key_opt.has_value()){
 			if(parsing_mode == Parsing_Mode::Lenient){
 				break;
 			}
 
-			throw bencode_error("Invalid or non-existent dictionary key");
+			throw bencode_error("Invalid or non-existent dictionary key",index);
 		}
 
 
 		auto & [key,key_forward_index] = key_opt.value();
 		index = key_forward_index;
 
-		auto value_opt = extract_value(std::forward<Bencoded>(content),content_length,parsing_mode,index);
+		auto value_opt = extract_value(std::forward<Bencoded_T>(content),content_length,parsing_mode,index);
 
 		if(value_opt.has_value()){
 			auto & [value,forward_index] = value_opt.value();
@@ -499,8 +502,6 @@ inline void extract_info_dictionary(const dictionary & info_dictionary,Metadata 
 		}else if(info_key == "files"){
 			metadata.single_file = false;
 			extract_files_info(std::any_cast<list>(value),metadata);
-		}else{
-			std::cerr << info_key << " info_key not recognized by parser\n";
 		}
 	}
 }
