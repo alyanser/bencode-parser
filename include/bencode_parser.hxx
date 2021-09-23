@@ -31,7 +31,7 @@ public:
 		return what_.data();
 	}
 
-	[[nodiscard]] auto error_index() const noexcept {
+	[[nodiscard]] std::size_t error_index() const noexcept {
 		return error_index_;
 	}
 private:
