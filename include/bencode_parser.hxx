@@ -114,7 +114,9 @@ result_type parse_file(Path && file_path,const Parsing_Mode parsing_mode = Parsi
 	return parse_content(std::move(content),parsing_mode);
 }
 
-std::string extract_any(const std::any & value,std::uint64_t value_type_hash);
+namespace impl {
+	std::string extract_any(const std::any & value,std::uint64_t value_type_hash);
+} // namespace impl
 
 /**
  * @brief Extracts the content from parsed dictoinary recursively. Result might contain non-standard dictionary keys.
@@ -128,11 +130,13 @@ inline std::string convert_to_string(const std::map<std::string,std::any> & pars
 	std::string dict_content;
 
 	for(const auto & [dictionary_key,value] : parsed_content){
-		dict_content += extract_any(value,value.type().hash_code()) + delimeter;
+		dict_content += impl::extract_any(value,value.type().hash_code()) + delimeter;
 	}
 
 	return dict_content;
 }
+
+namespace impl {
 
 inline std::string extract_any(const std::any & value,const std::uint64_t value_type_hash = typeid(dictionary).hash_code()){
 
@@ -164,6 +168,9 @@ inline std::string extract_any(const std::any & value,const std::uint64_t value_
 
 	return convert_to_string(std::any_cast<dictionary>(value));
 };
+
+} // namespace impl
+
 
 /**
  * @brief Metadata containing content of standard-compliaint dictionary keys. Returned from bencode::extract_content
@@ -256,7 +263,7 @@ inline Metadata extract_metadata(const dictionary & parsed_content) noexcept {
 			metadata.announce_url_list = impl::extract_announce_list(std::any_cast<list>(value));
 		}else if(dict_key == "info"){
 			impl::extract_info_dictionary(std::any_cast<dictionary>(value),metadata);
-			metadata.raw_info_dict = extract_any(value);
+			metadata.raw_info_dict = impl::extract_any(value);
 		}
 	}
 
