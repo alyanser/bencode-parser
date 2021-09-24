@@ -56,11 +56,11 @@ namespace impl {
 using list_result = std::optional<std::pair<list,std::size_t>>;
 using dictionary_result = std::optional<std::pair<dictionary,std::size_t>>;
 
-template<typename Bencoded_T>
-dictionary_result extract_dictionary(Bencoded_T && content,std::size_t content_length,Parsing_Mode parsing_mode,std::size_t index);
+template<typename Bencoded>
+dictionary_result extract_dictionary(Bencoded && content,std::size_t content_length,Parsing_Mode parsing_mode,std::size_t index);
 
-template<typename Bencoded_T>
-list_result extract_list(Bencoded_T && content,std::size_t content_length,Parsing_Mode mode,std::size_t index);
+template<typename Bencoded>
+list_result extract_list(Bencoded && content,std::size_t content_length,Parsing_Mode mode,std::size_t index);
 
 } // namespace impl
 
@@ -71,16 +71,16 @@ list_result extract_list(Bencoded_T && content,std::size_t content_length,Parsin
  * @param parsing_mode Parsing strictness specifier.
  * @return result_type :- [dictionary_titles,values].
  */
-template<typename Bencoded_T>
+template<typename Bencoded>
 [[nodiscard]] 
-result_type parse_content(Bencoded_T && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
+result_type parse_content(Bencoded && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
 	const auto content_length = std::size(content);
 
 	if(!content_length){
 		throw bencode_error("expects non-empty input");
 	}
 
-	if(const auto dict_opt = impl::extract_dictionary(std::forward<Bencoded_T>(content),content_length,parsing_mode,0)){
+	if(const auto dict_opt = impl::extract_dictionary(std::forward<Bencoded>(content),content_length,parsing_mode,0)){
 		auto & [dict,forward_index] = dict_opt.value();
 		return std::move(dict);
 	}
@@ -269,9 +269,9 @@ using integer_result = std::optional<std::pair<std::int64_t,std::size_t>>;
 using label_result = std::optional<std::pair<std::string,std::size_t>>;
 using value_result = std::optional<std::pair<std::any,std::size_t>>;
 
-template<typename Bencoded_T>
+template<typename Bencoded>
 [[nodiscard]]
-integer_result extract_integer(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+integer_result extract_integer(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 	assert(index < content_length);
 
 	if(content[index] != 'i'){
@@ -311,9 +311,9 @@ integer_result extract_integer(Bencoded_T && content,const std::size_t content_l
 	return negative ? std::make_pair(-result,index + 1) : std::make_pair(result,index + 1);
 }
 
-template<typename Bencoded_T>
+template<typename Bencoded>
 [[nodiscard]]
-label_result extract_label(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+label_result extract_label(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 	assert(index < content_length);
 
 	if(!std::isdigit(content[index])){
@@ -349,32 +349,32 @@ label_result extract_label(Bencoded_T && content,const std::size_t content_lengt
 	return std::make_pair(std::move(result),index);
 }
 
-template<typename Bencoded_T>
+template<typename Bencoded>
 [[nodiscard]]
-value_result extract_value(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+value_result extract_value(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 
-	if(const auto integer_opt = extract_integer(std::forward<Bencoded_T>(content),content_length,parsing_mode,index)){
+	if(const auto integer_opt = extract_integer(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
 		return integer_opt;
 	}
 
-	if(const auto label_opt = extract_label(std::forward<Bencoded_T>(content),content_length,parsing_mode,index)){
+	if(const auto label_opt = extract_label(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
 		return label_opt;
 	}
 
-	if(const auto list_opt = extract_list(std::forward<Bencoded_T>(content),content_length,parsing_mode,index)){
+	if(const auto list_opt = extract_list(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
 		return list_opt;
 	}
 
-	if(const auto dictionary_opt = extract_dictionary(std::forward<Bencoded_T>(content),content_length,parsing_mode,index)){
+	if(const auto dictionary_opt = extract_dictionary(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
 		return dictionary_opt;
 	}
 
 	return {};
 }
 
-template<typename Bencoded_T>
+template<typename Bencoded>
 [[nodiscard]]
-list_result extract_list(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+list_result extract_list(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 	assert(index < content_length);
 
 	if(content[index] != 'l'){
@@ -384,7 +384,7 @@ list_result extract_list(Bencoded_T && content,const std::size_t content_length,
 	std::vector<std::any> result;
 
 	for(++index;index < content_length && content[index] != 'e';){
-		auto value_opt = extract_value(std::forward<Bencoded_T>(content),content_length,parsing_mode,index);
+		auto value_opt = extract_value(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
 		if(value_opt.has_value()){
 			auto & [value,forward_index] = value_opt.value();
@@ -400,9 +400,9 @@ list_result extract_list(Bencoded_T && content,const std::size_t content_length,
 	return std::make_pair(std::move(result),index + 1);
 }
 
-template<typename Bencoded_T>
+template<typename Bencoded>
 [[nodiscard]]
-dictionary_result extract_dictionary(Bencoded_T && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+dictionary_result extract_dictionary(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
 	assert(index < content_length);
 
 	if(content[index] != 'd'){
@@ -412,7 +412,7 @@ dictionary_result extract_dictionary(Bencoded_T && content,const std::size_t con
 	std::map<std::string,std::any> result;
 
 	for(++index;index < content_length && content[index] != 'e';){
-		const auto key_opt = extract_label(std::forward<Bencoded_T>(content),content_length,parsing_mode,index);
+		const auto key_opt = extract_label(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
 		if(!key_opt.has_value()){
 			if(parsing_mode == Parsing_Mode::Lenient){
@@ -426,7 +426,7 @@ dictionary_result extract_dictionary(Bencoded_T && content,const std::size_t con
 		auto & [key,key_forward_index] = key_opt.value();
 		index = key_forward_index;
 
-		auto value_opt = extract_value(std::forward<Bencoded_T>(content),content_length,parsing_mode,index);
+		auto value_opt = extract_value(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
 		if(value_opt.has_value()){
 			auto & [value,forward_index] = value_opt.value();
