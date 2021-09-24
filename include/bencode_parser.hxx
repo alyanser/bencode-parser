@@ -114,6 +114,8 @@ result_type parse_file(Path && file_path,const Parsing_Mode parsing_mode = Parsi
 	return parse_content(std::move(content),parsing_mode);
 }
 
+std::string extract_any(const std::any & value,std::uint64_t value_type_hash);
+
 /**
  * @brief Extracts the content from parsed dictoinary recursively. Result might contain non-standard dictionary keys.
  * 
@@ -123,49 +125,45 @@ result_type parse_file(Path && file_path,const Parsing_Mode parsing_mode = Parsi
  */
 inline std::string convert_to_string(const std::map<std::string,std::any> & parsed_content,const char delimeter = '\n') noexcept {
 
-	auto dump_list = [](auto compare_hash,auto && list){
+	std::string dict_content;
+
+	for(const auto & [dictionary_key,value] : parsed_content){
+		dict_content += extract_any(value,value.type().hash_code()) + delimeter;
+	}
+
+	return dict_content;
+}
+
+inline std::string extract_any(const std::any & value,const std::uint64_t value_type_hash = typeid(dictionary).hash_code()){
+
+	auto extract_inner_list = [](auto && list){
 		std::string list_content;
 		
 		for(const auto & value : list){
-			list_content += compare_hash(compare_hash,value,value.type().hash_code());
+			list_content += extract_any(value,value.type().hash_code());
 		}
 		
 		return list_content;
 	};
 
-	auto compare_hash = [dump_list](auto compare_hash,auto && value,const auto value_type_hash){
-		const static auto label_type_hash = typeid(std::string).hash_code();
-		const static auto integer_type_hash = typeid(std::int64_t).hash_code();
-		const static auto list_Type_hash = typeid(list).hash_code();
-		const static auto dictionary_type_hash = typeid(dictionary).hash_code();
+	const static auto label_type_hash = typeid(std::string).hash_code();
+	const static auto integer_type_hash = typeid(std::int64_t).hash_code();
+	const static auto list_Type_hash = typeid(list).hash_code();
 
-		if(value_type_hash == label_type_hash){
-			return std::any_cast<std::string>(value);
-		}
-
-		if(value_type_hash == integer_type_hash){
-			return std::to_string(std::any_cast<std::int64_t>(value));
-		}
-
-		if(value_type_hash == list_Type_hash){
-			return dump_list(compare_hash,std::any_cast<list>(value));
-		}
-
-		if(value_type_hash == dictionary_type_hash){
-			return convert_to_string(std::any_cast<dictionary>(value));
-		}
-
-		__builtin_unreachable();
-	};
-
-	std::string dict_content;
-
-	for(const auto & [dictionary_key,value] : parsed_content){
-		dict_content += dictionary_key + compare_hash(compare_hash,value,value.type().hash_code()) + delimeter;
+	if(value_type_hash == label_type_hash){
+		return std::any_cast<std::string>(value);
 	}
 
-	return dict_content;
-}
+	if(value_type_hash == integer_type_hash){
+		return std::to_string(std::any_cast<std::int64_t>(value));
+	}
+
+	if(value_type_hash == list_Type_hash){
+		return extract_inner_list(std::any_cast<list>(value));
+	}
+
+	return convert_to_string(std::any_cast<dictionary>(value));
+};
 
 /**
  * @brief Metadata containing content of standard-compliaint dictionary keys. Returned from bencode::extract_content
@@ -179,6 +177,7 @@ struct Metadata {
 	std::string encoding;
 	std::string pieces;
 	std::string md5sum;
+	std::string raw_info_dict;
 	std::vector<std::pair<std::string,std::int64_t>> file_info; // [file_path,file_size : bytes]
 	std::vector<std::string> announce_url_list;
 	std::vector<std::string> peers; // binary model
@@ -257,6 +256,7 @@ inline Metadata extract_metadata(const dictionary & parsed_content) noexcept {
 			metadata.announce_url_list = impl::extract_announce_list(std::any_cast<list>(value));
 		}else if(dict_key == "info"){
 			impl::extract_info_dictionary(std::any_cast<dictionary>(value),metadata);
+			metadata.raw_info_dict = extract_any(value);
 		}
 	}
 
@@ -421,7 +421,6 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 
 			throw bencode_error("Invalid or non-existent dictionary key",index);
 		}
-
 
 		auto & [key,key_forward_index] = key_opt.value();
 		index = key_forward_index;
