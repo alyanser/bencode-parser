@@ -1,4 +1,5 @@
 #include "bencode_parser.hxx"
+#include <iostream>
 
 int main(){
 	const auto result = bencode::parse_file("../examples/sample-input/big-buck-bunny.torrent");

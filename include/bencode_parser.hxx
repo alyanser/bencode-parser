@@ -12,7 +12,6 @@
 #include <sstream>
 #include <cassert>
 #include <utility>
-#include <iostream>
 #include <any>
 #include <map>
 
@@ -25,7 +24,10 @@ class bencode_error : public std::exception {
 public:
 	using exception::exception;
 
-	explicit bencode_error(const std::string_view error,const std::size_t error_index = 0) : what_(error), error_index_(error_index){}
+	explicit bencode_error(const std::string_view error,const std::size_t error_index = 0) : 
+		what_(error), error_index_(error_index)
+	{
+	}
 
 	[[nodiscard]] const char * what() const noexcept override {
 		return what_.data();
@@ -117,7 +119,6 @@ namespace impl {
  * @return std::string : result of conversion
  */
 inline std::string convert_to_string(const std::map<std::string,std::any> & parsed_content,const char delimeter = '\n') noexcept {
-
 	std::string dict_content;
 
 	for(const auto & [dictionary_key,value] : parsed_content){
@@ -284,6 +285,7 @@ std::string read_file(Path && file_path) noexcept {
 
 	std::stringstream s_stream;
 	s_stream << in_stream.rdbuf();
+	
 	return s_stream.str();
 }
 
@@ -471,7 +473,7 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 		value = std::make_pair(info_begin_idx,index - 1);
 	}
 
-	return std::pair{result,index + 1};
+	return std::make_pair(std::move(result),index + 1);
 }
 
 [[nodiscard]]
