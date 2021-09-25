@@ -9,4 +9,6 @@ int main(){
 
 	// only evaluate dictionary standard dictionary keys
 	std::cout << bencode::convert_to_string(metadata) << '\n';
+
+	std::cout << metadata.raw_info_dict << '\n';
 }

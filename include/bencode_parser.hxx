@@ -6,10 +6,10 @@
 #define BENCODE_PARSER_HXX
 
 #include <optional>
-#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
+#include <sstream>
 #include <cassert>
 #include <utility>
 #include <iostream>
@@ -60,7 +60,10 @@ template<typename Bencoded>
 dictionary_result extract_dictionary(Bencoded && content,std::size_t content_length,Parsing_Mode parsing_mode,std::size_t index);
 
 template<typename Bencoded>
-list_result extract_list(Bencoded && content,std::size_t content_length,Parsing_Mode mode,std::size_t index);
+list_result extract_list(Bencoded && content,std::size_t content_length,Parsing_Mode mode,std::size_t index) noexcept;
+
+template<typename Path>
+std::string read_file(Path && file_path) noexcept;
 
 } // namespace impl
 
@@ -71,17 +74,18 @@ list_result extract_list(Bencoded && content,std::size_t content_length,Parsing_
  * @param parsing_mode Parsing strictness specifier.
  * @return result_type :- [dictionary_titles,values].
  */
-template<typename Bencoded>
+template<typename Bencoded,typename Path>
 [[nodiscard]] 
-result_type parse_content(Bencoded && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
+result_type parse_content(Bencoded && content,Path && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
 	const auto content_length = std::size(content);
 
 	if(!content_length){
 		throw bencode_error("expects non-empty input");
 	}
 
-	if(const auto dict_opt = impl::extract_dictionary(std::forward<Bencoded>(content),content_length,parsing_mode,0)){
+	if(auto dict_opt = impl::extract_dictionary(std::forward<Bencoded>(content),content_length,parsing_mode,0)){
 		auto & [dict,forward_index] = dict_opt.value();
+		dict.emplace("file_path",std::string(std::forward<Path>(file_path)));
 		return std::move(dict);
 	}
 
@@ -98,20 +102,7 @@ result_type parse_content(Bencoded && content,const Parsing_Mode parsing_mode = 
 template<typename Path>
 [[nodiscard]]
 result_type parse_file(Path && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
-	std::ifstream in_fstream(std::forward<Path>(file_path));
-
-	if(!in_fstream.is_open()){
-		throw bencode_error("File doesn't exist or could not be opened for reading");
-	}
-
-	const auto file_size = std::filesystem::file_size(std::forward<Path>(file_path));
-
-	std::string content;
-	content.reserve(file_size);
-
-	for(std::string temp;std::getline(in_fstream,temp);content += temp){}
-
-	return parse_content(std::move(content),parsing_mode);
+	return parse_content(impl::read_file(std::forward<Path>(file_path)),std::forward<Path>(file_path),parsing_mode);
 }
 
 namespace impl {
@@ -166,11 +157,14 @@ inline std::string extract_any(const std::any & value,const std::uint64_t value_
 		return extract_inner_list(std::any_cast<list>(value));
 	}
 
-	return convert_to_string(std::any_cast<dictionary>(value));
+	if(value_type_hash == typeid(dictionary).hash_code()){
+		return convert_to_string(std::any_cast<dictionary>(value));
+	}
+
+	return {};
 };
 
 } // namespace impl
-
 
 /**
  * @brief Metadata containing content of standard-compliaint dictionary keys. Returned from bencode::extract_content
@@ -187,7 +181,7 @@ struct Metadata {
 	std::string raw_info_dict;
 	std::vector<std::pair<std::string,std::int64_t>> file_info; // [file_path,file_size : bytes]
 	std::vector<std::string> announce_url_list;
-	std::vector<std::string> peers; // binary model
+	std::vector<std::string> peers; // binary model format
 	std::int64_t piece_length = 0;
 	std::int64_t single_file_size = 0;
 	std::int64_t multiple_files_size = 0;
@@ -263,7 +257,11 @@ inline Metadata extract_metadata(const dictionary & parsed_content) noexcept {
 			metadata.announce_url_list = impl::extract_announce_list(std::any_cast<list>(value));
 		}else if(dict_key == "info"){
 			impl::extract_info_dictionary(std::any_cast<dictionary>(value),metadata);
-			metadata.raw_info_dict = impl::extract_any(value);
+		}else if(dict_key == "info_range"){
+			const auto [info_begin_idx,info_end_idx] = std::any_cast<std::pair<std::size_t,std::size_t>>(value);
+			const auto content = impl::read_file(std::any_cast<std::string>(parsed_content.at("file_path")));
+			assert(content.size() > info_end_idx);
+			metadata.raw_info_dict = content.substr(info_begin_idx,info_end_idx);
 		}
 	}
 
@@ -275,6 +273,19 @@ namespace impl {
 using integer_result = std::optional<std::pair<std::int64_t,std::size_t>>;
 using label_result = std::optional<std::pair<std::string,std::size_t>>;
 using value_result = std::optional<std::pair<std::any,std::size_t>>;
+
+template<typename Path>
+std::string read_file(Path && file_path) noexcept {
+	std::ifstream in_stream(std::forward<Path>(file_path));
+
+	if(!in_stream.is_open()){
+		return {};
+	}
+
+	std::stringstream s_stream;
+	s_stream << in_stream.rdbuf();
+	return s_stream.str();
+}
 
 template<typename Bencoded>
 [[nodiscard]]
@@ -358,7 +369,7 @@ label_result extract_label(Bencoded && content,const std::size_t content_length,
 
 template<typename Bencoded>
 [[nodiscard]]
-value_result extract_value(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+value_result extract_value(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index) noexcept {
 
 	if(const auto integer_opt = extract_integer(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
 		return integer_opt;
@@ -381,7 +392,7 @@ value_result extract_value(Bencoded && content,const std::size_t content_length,
 
 template<typename Bencoded>
 [[nodiscard]]
-list_result extract_list(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index){
+list_result extract_list(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index) noexcept {
 	assert(index < content_length);
 
 	if(content[index] != 'l'){
@@ -418,6 +429,8 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 
 	std::map<std::string,std::any> result;
 
+	bool is_info_dict = false;
+
 	for(++index;index < content_length && content[index] != 'e';){
 		const auto key_opt = extract_label(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
@@ -432,6 +445,12 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 		auto & [key,key_forward_index] = key_opt.value();
 		index = key_forward_index;
 
+		if(key == "info"){
+			is_info_dict = true;
+			const auto [itr,success] = result.emplace("info_range",index);
+			assert(success);
+		}
+
 		auto value_opt = extract_value(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
 		if(value_opt.has_value()){
@@ -443,6 +462,14 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 		}else{
 			return {};
 		}
+	}
+
+	if(is_info_dict){
+		auto & value = result["info_range"];
+		const auto info_begin_idx = std::any_cast<std::size_t>(value);
+		assert(info_begin_idx);
+		value = std::make_pair(info_begin_idx,index);
+		std::cout << value.type().name() << '\n';
 	}
 
 	return std::pair{result,index + 1};
