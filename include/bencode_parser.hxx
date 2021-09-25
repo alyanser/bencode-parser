@@ -468,8 +468,7 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 		auto & value = result["info_range"];
 		const auto info_begin_idx = std::any_cast<std::size_t>(value);
 		assert(info_begin_idx);
-		value = std::make_pair(info_begin_idx,index);
-		std::cout << value.type().name() << '\n';
+		value = std::make_pair(info_begin_idx,index - 1);
 	}
 
 	return std::pair{result,index + 1};
