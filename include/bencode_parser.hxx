@@ -86,7 +86,7 @@ result_type parse_content(Bencoded && content,Path && file_path,const Parsing_Mo
 	}
 
 	if(auto dict_opt = impl::extract_dictionary(std::forward<Bencoded>(content),content_length,parsing_mode,0)){
-		auto & [dict,forward_index] = dict_opt.value();
+		auto & [dict,forward_index] = *dict_opt;
 		dict.emplace("file_path",std::string(std::forward<Path>(file_path)));
 		return std::move(dict);
 	}
@@ -406,8 +406,8 @@ list_result extract_list(Bencoded && content,const std::size_t content_length,co
 	for(++index;index < content_length && content[index] != 'e';){
 		auto value_opt = extract_value(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
-		if(value_opt.has_value()){
-			auto & [value,forward_index] = value_opt.value();
+		if(value_opt){
+			auto & [value,forward_index] = *value_opt;
 			result.emplace_back(std::move(value));
 			index = forward_index;
 		}else if(parsing_mode == Parsing_Mode::Lenient){
@@ -436,7 +436,7 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 	for(++index;index < content_length && content[index] != 'e';){
 		const auto key_opt = extract_label(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
-		if(!key_opt.has_value()){
+		if(!key_opt){
 			if(parsing_mode == Parsing_Mode::Lenient){
 				break;
 			}
@@ -444,7 +444,7 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 			throw bencode_error("Invalid or non-existent dictionary key",index);
 		}
 
-		auto & [key,key_forward_index] = key_opt.value();
+		auto & [key,key_forward_index] = *key_opt;
 		index = key_forward_index;
 
 		if(key == "info"){
@@ -455,8 +455,8 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 
 		auto value_opt = extract_value(std::forward<Bencoded>(content),content_length,parsing_mode,index);
 
-		if(value_opt.has_value()){
-			auto & [value,forward_index] = value_opt.value();
+		if(value_opt){
+			auto & [value,forward_index] = *value_opt;
 			result.emplace(std::move(key),std::move(value));
 			index = forward_index;
 		}else if(parsing_mode == Parsing_Mode::Lenient){
