@@ -450,7 +450,7 @@ dictionary_result extract_dictionary(Bencoded && content,const std::size_t conte
 
                   if(key == "info"){
                            is_info_dict = true;
-                           const auto [itr,success] = result.emplace("info_range",index);
+                           [[maybe_unused]] const auto [itr,success] = result.emplace("info_range",index);
                            assert(success);
                   }
 
