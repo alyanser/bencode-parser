@@ -13,7 +13,7 @@ int main(){
          }
 
          // possibly containing non-standard compliant keys and values
-         std::cout << bencode::convert_to_string(result) << '\n';
+         // std::cout << bencode::convert_to_string(result) << '\n';
 
-         std::cout << metadata.raw_info_dict << '\n';
+         // std::cout << metadata.raw_info_dict << '\n';
 }
