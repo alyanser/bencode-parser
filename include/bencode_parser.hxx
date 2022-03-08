@@ -78,9 +78,9 @@ std::string read_file(Path && file_path) noexcept;
  * @param parsing_mode Parsing strictness specifier.
  * @return result_type :- [dictionary_titles,values].
  */
-template<typename Bencoded,typename Path>
+template<typename Bencoded>
 [[nodiscard]] 
-result_type parse_content(Bencoded && content,Path && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
+result_type parse_content(Bencoded && content,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
          const auto content_length = std::size(content);
 
          if(!content_length){
@@ -89,7 +89,6 @@ result_type parse_content(Bencoded && content,Path && file_path,const Parsing_Mo
 
          if(auto dict_opt = impl::extract_dictionary(std::forward<Bencoded>(content),content_length,parsing_mode,0)){
                   auto & [dict,forward_index] = *dict_opt;
-                  dict.emplace("file_path",std::string(std::forward<Path>(file_path)));
                   return std::move(dict);
          }
 
