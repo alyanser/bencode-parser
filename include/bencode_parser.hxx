@@ -157,11 +157,11 @@ inline std::string extract_any(const std::any & value,const std::int64_t value_t
          }
 
          if(value_type_hash == list_type_hash){
-                  return extract_inner_list(std::any_cast<list>(value));
+                  return extract_inner_list(std::any_cast<const list &>(value));
          }
 
          if(value_type_hash == dict_type_hash){
-                  return convert_to_string(std::any_cast<dictionary>(value));
+                  return convert_to_string(std::any_cast<const dictionary &>(value));
          }
 
          return {};
@@ -260,9 +260,9 @@ inline Metadata extract_metadata(const dictionary & parsed_content,const std::st
                   }else if(dict_key == "comment"){
                            metadata.comment = std::any_cast<std::string>(value);
                   }else if(dict_key == "announce-list"){
-                           metadata.announce_url_list = impl::extract_announce_list(std::any_cast<list>(value));
+                           metadata.announce_url_list = impl::extract_announce_list(std::any_cast<const list &>(value));
                   }else if(dict_key == "info"){
-                           impl::extract_info_dictionary(std::any_cast<dictionary>(value),metadata);
+                           impl::extract_info_dictionary(std::any_cast<const dictionary &>(value),metadata);
                   }else if(!file_content.empty() && dict_key == "info_range"){
                            const auto [info_begin_idx,info_end_idx] = std::any_cast<std::pair<std::size_t,std::size_t>>(value);
 
@@ -378,7 +378,7 @@ label_result extract_label(Bencoded && content,const std::size_t content_length,
 
 template<typename Bencoded>
 [[nodiscard]]
-value_result extract_value(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,std::size_t index) noexcept {
+value_result extract_value(Bencoded && content,const std::size_t content_length,const Parsing_Mode parsing_mode,const std::size_t index) noexcept {
 
          if(const auto integer_opt = extract_integer(std::forward<Bencoded>(content),content_length,parsing_mode,index)){
                   return integer_opt;
@@ -490,7 +490,7 @@ inline std::vector<std::string> extract_announce_list(const list & parsed_list) 
 
          for(const auto & nested_list : parsed_list){
 
-                  for(const auto & announce_value : std::any_cast<list>(nested_list)){
+                  for(const auto & announce_value : std::any_cast<const list &>(nested_list)){
                            announce_list.emplace_back(std::any_cast<std::string>(announce_value));
                   }
          }
@@ -500,21 +500,19 @@ inline std::vector<std::string> extract_announce_list(const list & parsed_list) 
 
 inline void extract_files_info(const list & file_info_list,Metadata & metadata) noexcept {
 
-         for(const auto & file_info_dict : std::any_cast<list>(file_info_list)){
-                  metadata.file_info.emplace_back();
+         for(const auto & file_info_dict : file_info_list){
+                  auto & [file_path,file_length] = metadata.file_info.emplace_back();
 
-                  auto & [file_path,file_length] = metadata.file_info.back();
-
-                  for(const auto & [file_key,file_value] : std::any_cast<dictionary>(file_info_dict)){
+                  for(const auto & [file_key,file_value] : std::any_cast<const dictionary &>(file_info_dict)){
                            assert(file_key == "length" || file_key == "path");
 
                            if(file_key == "length"){
                                     file_length += std::any_cast<std::int64_t>(file_value);
                            }else{
-                                    const auto extracted_file_path = std::any_cast<list>(file_value);
+                                    const auto & extracted_file_path = std::any_cast<const list &>(file_value);
 
                                     for(const auto & file_or_dir : extracted_file_path){
-                                             file_path += std::any_cast<std::string>(file_or_dir) + '/';
+                                             file_path += std::any_cast<const std::string &>(file_or_dir) + '/';
                                     }
 
                                     if(!file_path.empty()){
@@ -544,7 +542,7 @@ inline void extract_info_dictionary(const dictionary & info_dictionary,Metadata 
                            metadata.md5sum = std::any_cast<std::string>(value);
                   }else if(info_key == "files"){
                            metadata.single_file = false;
-                           extract_files_info(std::any_cast<list>(value),metadata);
+                           extract_files_info(std::any_cast<const list &>(value),metadata);
                   }
          }
 }
