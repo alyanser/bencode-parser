@@ -105,7 +105,7 @@ result_type parse_content(Bencoded && content,const Parsing_Mode parsing_mode = 
 template<typename Path>
 [[nodiscard]]
 result_type parse_file(Path && file_path,const Parsing_Mode parsing_mode = Parsing_Mode::Strict){
-         return parse_content(impl::read_file(std::forward<Path>(file_path)),std::forward<Path>(file_path),parsing_mode);
+         return parse_content(impl::read_file(std::forward<Path>(file_path)),parsing_mode);
 }
 
 namespace impl {
@@ -263,13 +263,12 @@ inline Metadata extract_metadata(const dictionary & parsed_content,const std::st
                            metadata.announce_url_list = impl::extract_announce_list(std::any_cast<list>(value));
                   }else if(dict_key == "info"){
                            impl::extract_info_dictionary(std::any_cast<dictionary>(value),metadata);
-                  }else if(dict_key == "info_range"){
+                  }else if(!file_content.empty() && dict_key == "info_range"){
                            const auto [info_begin_idx,info_end_idx] = std::any_cast<std::pair<std::size_t,std::size_t>>(value);
-                           const auto content = file_content.empty() ? impl::read_file(std::any_cast<std::string>(parsed_content.at("file_path"))) : file_content;
 
-                           if(!content.empty()){
-                                    assert(content.size() > info_end_idx);
-                                    metadata.raw_info_dict = content.substr(info_begin_idx,info_end_idx - info_begin_idx + 1);
+                           if(!file_content.empty()){
+                                    assert(file_content.size() > info_end_idx);
+                                    metadata.raw_info_dict = file_content.substr(info_begin_idx,info_end_idx - info_begin_idx + 1);
                            }
                   }
          }
