@@ -1,6 +1,6 @@
 # bencode-parser
 
-<b>C++ Bencode parser</b>
+<b>Bencode parsing library</b>
 
 <b>Api</b>
 <pre>
