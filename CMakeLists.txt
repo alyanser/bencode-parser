@@ -8,5 +8,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED true)
 add_executable(${PROJECT_NAME} examples/example.cxx)
 
 include_directories(
-         "include"
+	"include"
 )
