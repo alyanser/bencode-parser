@@ -1,4 +1,4 @@
-#include "bencode_parser.hxx"
+#include "bencode-parser.h"
 #include <iostream>
 
 int main(){
