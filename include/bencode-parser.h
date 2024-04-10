@@ -59,7 +59,8 @@ dictionary_result extract_dictionary(Bencoded && content, std::size_t content_le
 template <typename Bencoded>
 list_result extract_list(Bencoded && content, std::size_t content_length, Parsing_Mode mode, std::size_t index) noexcept;
 
-template <typename Path> std::string read_file(Path && file_path) noexcept;
+template <typename Path>
+std::string read_file(Path && file_path) noexcept;
 
 } // namespace impl
 
@@ -93,7 +94,8 @@ template <typename Bencoded>
  * @param parsing_mode Parsing strictness specifier.
  * @return result_type :- [dictionary_titles,values.
  */
-template <typename Path> [[nodiscard]] result_type parse_file(Path && file_path, const Parsing_Mode parsing_mode = Parsing_Mode::Strict) {
+template <typename Path>
+[[nodiscard]] result_type parse_file(Path && file_path, const Parsing_Mode parsing_mode = Parsing_Mode::Strict) {
 	return parse_content(impl::read_file(std::forward<Path>(file_path)), parsing_mode);
 }
 
@@ -271,7 +273,8 @@ using integer_result = std::optional<std::pair<std::int64_t, std::size_t>>;
 using label_result = std::optional<std::pair<std::string, std::size_t>>;
 using value_result = std::optional<std::pair<std::any, std::size_t>>;
 
-template <typename Path> std::string read_file(Path && file_path) noexcept {
+template <typename Path>
+std::string read_file(Path && file_path) noexcept {
 	std::ifstream in_stream(std::forward<Path>(file_path));
 
 	if(!in_stream.is_open()) {
