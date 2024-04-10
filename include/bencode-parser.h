@@ -309,7 +309,7 @@ integer_result extract_integer(Bencoded && content, const std::size_t content_le
 	constexpr std::string_view ending_not_found("Ending character ('e') not found for integral value");
 
 	if(++index == content_length) {
-		throw bencode_error(ending_not_found.data(), index);
+		throw bencode_error(ending_not_found, index);
 	}
 
 	const bool negative = content[index] == '-';
@@ -327,7 +327,7 @@ integer_result extract_integer(Bencoded && content, const std::size_t content_le
 	}
 
 	if(index == content_length) {
-		throw bencode_error(ending_not_found.data(), index);
+		throw bencode_error(ending_not_found, index);
 	}
 
 	assert(content[index] == 'e');
