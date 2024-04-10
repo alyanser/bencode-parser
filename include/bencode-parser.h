@@ -27,9 +27,15 @@ class bencode_error : public std::exception {
 
 	explicit bencode_error(const std::string_view error, const std::size_t error_index = 0) : what_(error), error_index_(error_index) {}
 
-	[[nodiscard]] const char * what() const noexcept override { return what_.data(); }
+	[[nodiscard]]
+	const char * what() const noexcept override {
+		return what_.data();
+	}
 
-	[[nodiscard]] std::size_t error_index() const noexcept { return error_index_; }
+	[[nodiscard]]
+	std::size_t error_index() const noexcept {
+		return error_index_;
+	}
 
     private:
 	std::string_view what_;
@@ -72,7 +78,8 @@ std::string read_file(Path && file_path) noexcept;
  * @return result_type :- [dictionary_titles,values].
  */
 template <typename Bencoded>
-[[nodiscard]] result_type parse_content(Bencoded && content, const Parsing_Mode parsing_mode = Parsing_Mode::Strict) {
+[[nodiscard]]
+result_type parse_content(Bencoded && content, const Parsing_Mode parsing_mode = Parsing_Mode::Strict) {
 	const auto content_length = std::size(content);
 
 	if(!content_length) {
@@ -95,7 +102,8 @@ template <typename Bencoded>
  * @return result_type :- [dictionary_titles,values.
  */
 template <typename Path>
-[[nodiscard]] result_type parse_file(Path && file_path, const Parsing_Mode parsing_mode = Parsing_Mode::Strict) {
+[[nodiscard]]
+result_type parse_file(Path && file_path, const Parsing_Mode parsing_mode = Parsing_Mode::Strict) {
 	return parse_content(impl::read_file(std::forward<Path>(file_path)), parsing_mode);
 }
 
@@ -195,7 +203,8 @@ std::vector<std::string> extract_announce_list(const list & parsed_list) noexcep
  * @param delimeter : Delimeter inserted after each dictionary value.
  * @return std::string : Result of conversion.
  */
-[[nodiscard]] inline std::string convert_to_string(const Metadata & metadata, const std::string_view delimeter = "\n\n") noexcept {
+[[nodiscard]]
+inline std::string convert_to_string(const Metadata & metadata, const std::string_view delimeter = "\n\n") noexcept {
 	using namespace std::string_literals;
 
 	std::string str_fmt;
@@ -232,7 +241,8 @@ std::vector<std::string> extract_announce_list(const list & parsed_list) noexcep
  * @param file_content : No need to provide if bencode::parse_file was called and that same bencoded file exists. Otherwise,
  * can be provided to extract Metadata.raw_info_dict
  */
-[[nodiscard]] inline Metadata extract_metadata(const dictionary & parsed_content, const std::string & file_content = "") noexcept {
+[[nodiscard]]
+inline Metadata extract_metadata(const dictionary & parsed_content, const std::string & file_content = "") noexcept {
 	Metadata metadata;
 
 	for(const auto & [dict_key, value] : parsed_content) {
@@ -288,8 +298,8 @@ std::string read_file(Path && file_path) noexcept {
 }
 
 template <typename Bencoded>
-[[nodiscard]] integer_result extract_integer(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
-							   std::size_t index) {
+[[nodiscard]]
+integer_result extract_integer(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode, std::size_t index) {
 	assert(index < content_length);
 
 	if(content[index] != 'i') {
@@ -330,8 +340,8 @@ template <typename Bencoded>
 }
 
 template <typename Bencoded>
-[[nodiscard]] label_result extract_label(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
-						     std::size_t index) {
+[[nodiscard]]
+label_result extract_label(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode, std::size_t index) {
 	assert(index < content_length);
 
 	if(!std::isdigit(content[index])) {
@@ -368,8 +378,9 @@ template <typename Bencoded>
 }
 
 template <typename Bencoded>
-[[nodiscard]] value_result extract_value(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
-						     const std::size_t index) noexcept {
+[[nodiscard]]
+value_result extract_value(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
+				   const std::size_t index) noexcept {
 
 	if(const auto integer_opt = extract_integer(std::forward<Bencoded>(content), content_length, parsing_mode, index)) {
 		return integer_opt;
@@ -391,8 +402,9 @@ template <typename Bencoded>
 }
 
 template <typename Bencoded>
-[[nodiscard]] list_result extract_list(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
-						   std::size_t index) noexcept {
+[[nodiscard]]
+list_result extract_list(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
+				 std::size_t index) noexcept {
 	assert(index < content_length);
 
 	if(content[index] != 'l') {
@@ -419,8 +431,9 @@ template <typename Bencoded>
 }
 
 template <typename Bencoded>
-[[nodiscard]] dictionary_result extract_dictionary(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
-								   std::size_t index) {
+[[nodiscard]]
+dictionary_result extract_dictionary(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
+						 std::size_t index) {
 	assert(index < content_length);
 
 	if(content[index] != 'd') {
@@ -474,7 +487,8 @@ template <typename Bencoded>
 	return std::make_pair(std::move(result), index + 1);
 }
 
-[[nodiscard]] inline std::vector<std::string> extract_announce_list(const list & parsed_list) noexcept {
+[[nodiscard]]
+inline std::vector<std::string> extract_announce_list(const list & parsed_list) noexcept {
 	std::vector<std::string> announce_list;
 	announce_list.reserve(parsed_list.size());
 
