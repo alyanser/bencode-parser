@@ -19,12 +19,12 @@ std::string = bencode::convert_to_string(bencode::result_type) // may contain no
 
 <b>Examples</b><br>
 <pre>
-See examples/example.cxx
+See examples/example.cc
 </pre>
 
 <b>Installation</b>
 <pre>
-Just include bencode_parser.hxx
+Just include bencode_parser.h
 </pre>
 </pre>
 <b>Parsing Mode</b>
