@@ -22,7 +22,7 @@ namespace bencode {
  * @brief Exception class thrown when parsing fails.
  */
 class bencode_error : public std::exception {
-    public:
+public:
 	using exception::exception;
 
 	explicit bencode_error(const std::string_view error, const std::size_t error_index = 0) : what_(error), error_index_(error_index) {}
@@ -37,7 +37,7 @@ class bencode_error : public std::exception {
 		return error_index_;
 	}
 
-    private:
+private:
 	std::string_view what_;
 	std::size_t error_index_ = 0;
 };
@@ -52,21 +52,26 @@ using result_type = dictionary;
  * Strict : Do not tolerate any error in the given bencoding. Standard compliant result.
  * Lenient : Tolerate all possible errors. Possibly non-standard result.
  */
-enum class Parsing_Mode { Strict, Lenient };
+enum class Parsing_Mode {
+	Strict,
+	Lenient
+};
 
 namespace impl {
 
 using list_result = std::optional<std::pair<list, std::size_t>>;
 using dictionary_result = std::optional<std::pair<dictionary, std::size_t>>;
 
-template <typename Bencoded>
+template<typename Bencoded>
 dictionary_result extract_dictionary(Bencoded && content, std::size_t content_length, Parsing_Mode parsing_mode, std::size_t index);
 
-template <typename Bencoded>
+template<typename Bencoded>
 list_result extract_list(Bencoded && content, std::size_t content_length, Parsing_Mode mode, std::size_t index) noexcept;
 
-template <typename Path>
+template<typename Path>
 std::string read_file(Path && file_path) noexcept;
+
+std::string read_file(const std::string_view file_path) noexcept;
 
 } // namespace impl
 
@@ -77,7 +82,7 @@ std::string read_file(Path && file_path) noexcept;
  * @param parsing_mode Parsing strictness specifier.
  * @return result_type :- [dictionary_titles,values].
  */
-template <typename Bencoded>
+template<typename Bencoded>
 [[nodiscard]]
 result_type parse_content(Bencoded && content, const Parsing_Mode parsing_mode = Parsing_Mode::Strict) {
 	const auto content_length = std::size(content);
@@ -101,7 +106,7 @@ result_type parse_content(Bencoded && content, const Parsing_Mode parsing_mode =
  * @param parsing_mode Parsing strictness specifier.
  * @return result_type :- [dictionary_titles,values.
  */
-template <typename Path>
+template<typename Path>
 [[nodiscard]]
 result_type parse_file(Path && file_path, const Parsing_Mode parsing_mode = Parsing_Mode::Strict) {
 	return parse_content(impl::read_file(std::forward<Path>(file_path)), parsing_mode);
@@ -283,7 +288,7 @@ using integer_result = std::optional<std::pair<std::int64_t, std::size_t>>;
 using label_result = std::optional<std::pair<std::string, std::size_t>>;
 using value_result = std::optional<std::pair<std::any, std::size_t>>;
 
-template <typename Path>
+template<typename Path>
 std::string read_file(Path && file_path) noexcept {
 	std::ifstream in_stream(std::forward<Path>(file_path));
 
@@ -297,7 +302,9 @@ std::string read_file(Path && file_path) noexcept {
 	return s_stream.str();
 }
 
-template <typename Bencoded>
+std::string read_file(const std::string_view file_path) noexcept { return read_file(file_path.data()); }
+
+template<typename Bencoded>
 [[nodiscard]]
 integer_result extract_integer(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode, std::size_t index) {
 	assert(index < content_length);
@@ -339,7 +346,7 @@ integer_result extract_integer(Bencoded && content, const std::size_t content_le
 	return negative ? std::make_pair(-result, index + 1) : std::make_pair(result, index + 1);
 }
 
-template <typename Bencoded>
+template<typename Bencoded>
 [[nodiscard]]
 label_result extract_label(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode, std::size_t index) {
 	assert(index < content_length);
@@ -377,7 +384,7 @@ label_result extract_label(Bencoded && content, const std::size_t content_length
 	return std::make_pair(std::move(result), index);
 }
 
-template <typename Bencoded>
+template<typename Bencoded>
 [[nodiscard]]
 value_result extract_value(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
 				   const std::size_t index) noexcept {
@@ -401,7 +408,7 @@ value_result extract_value(Bencoded && content, const std::size_t content_length
 	return {};
 }
 
-template <typename Bencoded>
+template<typename Bencoded>
 [[nodiscard]]
 list_result extract_list(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
 				 std::size_t index) noexcept {
@@ -430,7 +437,7 @@ list_result extract_list(Bencoded && content, const std::size_t content_length, 
 	return std::make_pair(std::move(result), index + 1);
 }
 
-template <typename Bencoded>
+template<typename Bencoded>
 [[nodiscard]]
 dictionary_result extract_dictionary(Bencoded && content, const std::size_t content_length, const Parsing_Mode parsing_mode,
 						 std::size_t index) {

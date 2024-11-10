@@ -2,7 +2,9 @@
 #include <iostream>
 
 int main() {
-	const auto result = bencode::parse_file("../examples/sample-input/big-buck-bunny.torrent");
+	constexpr std::string_view sample_input_path = "../examples/sample-input/big-buck-bunny.torrent";
+
+	const auto result = bencode::parse_file(sample_input_path);
 	const auto metadata = bencode::extract_metadata(result);
 
 	// only evaluate dictionary standard dictionary keys
