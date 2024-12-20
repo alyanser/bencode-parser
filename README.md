@@ -33,11 +33,11 @@ Pass any of these enum constants to the functions mentioned in Api.<Br>
 <b>bencode::Parsing_Mode::Strict</b> (default) to consider any syntax error as fatal and throw.
 <b>bencode::Parsing_Mode::Lenient</b> to ignore as many errors as possible.
 </pre>
-<b>Testing</b>
+<b>Building test</b>
 <pre>
 git clone https://github.com/alyanser/bencode-parser
-cd bencode-parser && mkdir build && cd build 
-cmake .. && make && ./bencode-parser 
+cd bencode-parser
+cmake -B build && cmake --build build
 </pre>
 
 <b>Sample metadata result returned by bencode::convert_to_string</b>
