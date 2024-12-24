@@ -302,7 +302,9 @@ std::string read_file(Path && file_path) noexcept {
 	return s_stream.str();
 }
 
-std::string read_file(const std::string_view file_path) noexcept { return read_file(file_path.data()); }
+inline std::string read_file(const std::string_view file_path) noexcept {
+	return read_file(file_path.data());
+}
 
 template<typename Bencoded>
 [[nodiscard]]
